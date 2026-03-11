@@ -1,5 +1,6 @@
 ---
 source: tests/integration_tests/help.rs
+assertion_line: 120
 info:
   program: wt
   args:
@@ -10,6 +11,7 @@ info:
     GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
+    NO_COLOR: ""
     PSModulePath: ""
     RUST_LOG: warn
     SHELL: ""
@@ -37,6 +39,7 @@ Commands:
   remove  Remove worktree; delete branch if merged
   merge   Merge current branch into target
   step    Run individual operations
+  stack   Manage stacked branches
   hook    Run configured hooks
   config  Manage user & project configs
 

@@ -20,6 +20,7 @@ mod relocate;
 pub(crate) mod repository_ext;
 #[cfg(unix)]
 pub(crate) mod select;
+pub(crate) mod stack;
 pub(crate) mod statusline;
 pub(crate) mod step_commands;
 pub(crate) mod worktree;

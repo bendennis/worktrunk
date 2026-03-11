@@ -372,7 +372,14 @@ impl ColumnLayout {
             }
             ColumnKind::Branch => {
                 let text = item.branch.as_deref().unwrap_or("-");
-                self.render_text_cell(text, text_style)
+                let mut cell = self.render_text_cell(text, text_style);
+                if let Some(ref parent) = item.parent {
+                    cell.push_styled(
+                        format!(" ← {parent}"),
+                        Style::new().dimmed(),
+                    );
+                }
+                cell
             }
             ColumnKind::Status => {
                 let Some(ref status_symbols) = item.status_symbols else {

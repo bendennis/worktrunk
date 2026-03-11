@@ -1,6 +1,7 @@
 mod config;
 mod hook;
 mod list;
+mod stack;
 mod step;
 
 pub(crate) use config::{
@@ -9,6 +10,7 @@ pub(crate) use config::{
 };
 pub(crate) use hook::HookCommand;
 pub(crate) use list::ListSubcommand;
+pub(crate) use stack::StackCommand;
 pub(crate) use step::StepCommand;
 
 use clap::builder::styling::{AnsiColor, Color, Styles};
@@ -1074,6 +1076,12 @@ Alias names that match a built-in step command (`commit`, `squash`, etc.) are sh
     Step {
         #[command(subcommand)]
         action: StepCommand,
+    },
+
+    /// Manage stacked branches
+    Stack {
+        #[command(subcommand)]
+        action: StackCommand,
     },
 
     /// Run configured hooks

@@ -883,6 +883,7 @@ fn main() {
     let result = match command {
         Commands::Config { action } => handle_config_command(action),
         Commands::Step { action } => handle_step_command(action),
+        Commands::Stack { action } => commands::stack::handle_stack_command(action),
         Commands::Hook { action } => handle_hook_command(action),
         Commands::Select { branches, remotes } => handle_select_command(branches, remotes),
         Commands::List {

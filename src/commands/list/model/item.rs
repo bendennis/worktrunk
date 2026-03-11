@@ -188,6 +188,10 @@ pub struct ListItem {
     /// CI/PR status: None = not loaded, Some(None) = no CI, Some(Some(status)) = has CI
     pub pr_status: Option<Option<PrStatus>>,
 
+    /// Stacked branch parent (set via `wt switch -c --base` or `wt stack set-parent`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+
     /// Dev server URL computed from project config template
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
@@ -242,6 +246,7 @@ impl ListItem {
             is_orphan: None,
             upstream: None,
             pr_status: None,
+            parent: None,
             url: None,
             url_active: None,
             summary: None,

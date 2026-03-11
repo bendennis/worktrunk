@@ -83,6 +83,10 @@ pub struct JsonItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ci: Option<JsonCi>,
 
+    /// Stacked branch parent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+
     /// Dev server URL from project config template
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
@@ -348,6 +352,7 @@ impl JsonItem {
             is_current,
             is_previous,
             ci,
+            parent: item.parent.clone(),
             url: item.url.clone(),
             url_active: item.url_active,
             summary,
