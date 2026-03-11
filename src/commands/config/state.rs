@@ -302,6 +302,16 @@ pub fn handle_state_get(key: &str, branch: Option<String>) -> anyhow::Result<()>
                 None => println!(""),
             }
         }
+        "parent" => {
+            let branch_name = match branch {
+                Some(b) => b,
+                None => repo.require_current_branch("get parent for current branch")?,
+            };
+            match repo.branch_parent(&branch_name) {
+                Some(parent) => println!("{parent}"),
+                None => println!(""),
+            }
+        }
         "ci-status" => {
             let branch_name = match branch {
                 Some(b) => b,
@@ -355,7 +365,7 @@ pub fn handle_state_get(key: &str, branch: Option<String>) -> anyhow::Result<()>
         }
         _ => {
             anyhow::bail!(
-                "Unknown key: {key}. Valid keys: default-branch, previous-branch, ci-status, marker, logs"
+                "Unknown key: {key}. Valid keys: default-branch, previous-branch, ci-status, marker, parent, logs"
             )
         }
     }
@@ -389,6 +399,19 @@ pub fn handle_state_set(key: &str, value: String, branch: Option<String>) -> any
                 success_message(cformat!("Set previous branch to <bold>{value}</>"))
             );
         }
+        "parent" => {
+            let branch_name = match branch {
+                Some(b) => b,
+                None => repo.require_current_branch("set parent for current branch")?,
+            };
+            repo.set_branch_parent(&branch_name, &value)?;
+            eprintln!(
+                "{}",
+                success_message(cformat!(
+                    "Set parent for <bold>{branch_name}</> to <bold>{value}</>"
+                ))
+            );
+        }
         "marker" => {
             let branch_name = match branch {
                 Some(b) => b,
@@ -413,7 +436,7 @@ pub fn handle_state_set(key: &str, value: String, branch: Option<String>) -> any
             );
         }
         _ => {
-            anyhow::bail!("Unknown key: {key}. Valid keys: default-branch, previous-branch, marker")
+            anyhow::bail!("Unknown key: {key}. Valid keys: default-branch, previous-branch, marker, parent")
         }
     }
 
@@ -475,6 +498,50 @@ pub fn handle_state_clear(key: &str, branch: Option<String>, all: bool) -> anyho
                     eprintln!(
                         "{}",
                         info_message(cformat!("No CI cache for <bold>{branch_name}</>"))
+                    );
+                }
+            }
+        }
+        "parent" => {
+            if all {
+                let output = repo
+                    .run_command(&["config", "--get-regexp", r"^worktrunk\.state\..+\.parent$"])
+                    .unwrap_or_default();
+
+                let mut cleared_count = 0;
+                for line in output.lines() {
+                    if let Some(config_key) = line.split_whitespace().next() {
+                        repo.run_command(&["config", "--unset", config_key])?;
+                        cleared_count += 1;
+                    }
+                }
+
+                if cleared_count == 0 {
+                    eprintln!("{}", info_message("No parent relationships to clear"));
+                } else {
+                    eprintln!(
+                        "{}",
+                        success_message(cformat!(
+                            "Cleared <bold>{cleared_count}</> parent relationship{}",
+                            if cleared_count == 1 { "" } else { "s" }
+                        ))
+                    );
+                }
+            } else {
+                let branch_name = match branch {
+                    Some(b) => b,
+                    None => repo.require_current_branch("clear parent for current branch")?,
+                };
+
+                if repo.clear_branch_parent(&branch_name)? {
+                    eprintln!(
+                        "{}",
+                        success_message(cformat!("Cleared parent for <bold>{branch_name}</>"))
+                    );
+                } else {
+                    eprintln!(
+                        "{}",
+                        info_message(cformat!("No parent set for <bold>{branch_name}</>"))
                     );
                 }
             }
@@ -543,7 +610,7 @@ pub fn handle_state_clear(key: &str, branch: Option<String>, all: bool) -> anyho
         }
         _ => {
             anyhow::bail!(
-                "Unknown key: {key}. Valid keys: default-branch, previous-branch, ci-status, marker, logs"
+                "Unknown key: {key}. Valid keys: default-branch, previous-branch, ci-status, marker, parent, logs"
             )
         }
     }
@@ -567,6 +634,17 @@ pub fn handle_state_clear_all() -> anyhow::Result<()> {
         .is_ok()
     {
         cleared_any = true;
+    }
+
+    // Clear all parent relationships
+    let parents_output = repo
+        .run_command(&["config", "--get-regexp", r"^worktrunk\.state\..+\.parent$"])
+        .unwrap_or_default();
+    for line in parents_output.lines() {
+        if let Some(config_key) = line.split_whitespace().next() {
+            let _ = repo.run_command(&["config", "--unset", config_key]);
+            cleared_any = true;
+        }
     }
 
     // Clear all markers
@@ -626,6 +704,17 @@ fn handle_state_show_json(repo: &Repository) -> anyhow::Result<()> {
 
     // Get previous branch
     let previous_branch = repo.switch_previous();
+
+    // Get parent relationships
+    let parents: Vec<serde_json::Value> = get_all_parents(repo)
+        .into_iter()
+        .map(|(branch, parent)| {
+            serde_json::json!({
+                "branch": branch,
+                "parent": parent
+            })
+        })
+        .collect();
 
     // Get markers
     let markers: Vec<serde_json::Value> = get_all_markers(repo)
@@ -719,6 +808,7 @@ fn handle_state_show_json(repo: &Repository) -> anyhow::Result<()> {
     let output = serde_json::json!({
         "default_branch": default_branch,
         "previous_branch": previous_branch,
+        "parents": parents,
         "markers": markers,
         "ci_status": ci_status,
         "command_log": command_log,
@@ -748,6 +838,22 @@ fn handle_state_show_table(repo: &Repository) -> anyhow::Result<()> {
     match repo.switch_previous() {
         Some(prev) => writeln!(out, "{}", format_with_gutter(&prev, None))?,
         None => writeln!(out, "{}", format_with_gutter("(none)", None))?,
+    }
+    writeln!(out)?;
+
+    // Show branch parents (stacked branches)
+    writeln!(out, "{}", format_heading("BRANCH PARENTS", None))?;
+    let parents = get_all_parents(repo);
+    if parents.is_empty() {
+        writeln!(out, "{}", format_with_gutter("(none)", None))?;
+    } else {
+        let mut table = String::from("| Branch | Parent |\n");
+        table.push_str("|--------|--------|\n");
+        for (branch, parent) in &parents {
+            table.push_str(&format!("| {} | {} |\n", branch, parent));
+        }
+        let rendered = crate::md_help::render_markdown_table(&table);
+        writeln!(out, "{}", rendered.trim_end())?;
     }
     writeln!(out)?;
 
@@ -832,6 +938,35 @@ fn handle_state_show_table(repo: &Repository) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+// ==================== Marker Helpers ====================
+
+// ==================== Parent Helpers ====================
+
+/// Get all branch parent relationships from git config.
+fn get_all_parents(repo: &Repository) -> Vec<(String, String)> {
+    let output = repo
+        .run_command(&["config", "--get-regexp", r"^worktrunk\.state\..+\.parent$"])
+        .unwrap_or_default();
+
+    let mut parents = Vec::new();
+    for line in output.lines() {
+        // Format: "worktrunk.state.<branch>.parent parent_value"
+        let Some((key, value)) = line.split_once(' ') else {
+            continue;
+        };
+        let Some(branch) = key
+            .strip_prefix("worktrunk.state.")
+            .and_then(|s| s.strip_suffix(".parent"))
+        else {
+            continue;
+        };
+        parents.push((branch.to_string(), value.trim().to_string()));
+    }
+
+    parents.sort_by(|a, b| a.0.cmp(&b.0));
+    parents
 }
 
 // ==================== Marker Helpers ====================

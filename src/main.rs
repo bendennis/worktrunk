@@ -59,7 +59,7 @@ use output::handle_remove_output;
 use cli::{
     ApprovalsCommand, CiStatusAction, Cli, Commands, ConfigCommand, ConfigShellCommand,
     DefaultBranchAction, HintsAction, HookCommand, ListSubcommand, LogsAction, MarkerAction,
-    PreviousBranchAction, StateCommand, StepCommand,
+    ParentAction, PreviousBranchAction, StateCommand, StepCommand,
 };
 use worktrunk::HookType;
 
@@ -346,6 +346,12 @@ fn handle_state_command(action: StateCommand) -> anyhow::Result<()> {
             None => handle_state_get("marker", None),
             Some(MarkerAction::Set { value, branch }) => handle_state_set("marker", value, branch),
             Some(MarkerAction::Clear { branch, all }) => handle_state_clear("marker", branch, all),
+        },
+        StateCommand::Parent { action } => match action {
+            Some(ParentAction::Get { branch }) => handle_state_get("parent", branch),
+            None => handle_state_get("parent", None),
+            Some(ParentAction::Set { value, branch }) => handle_state_set("parent", value, branch),
+            Some(ParentAction::Clear { branch, all }) => handle_state_clear("parent", branch, all),
         },
         StateCommand::Logs { action } => match action {
             Some(LogsAction::Get { hook, branch }) => handle_logs_get(hook, branch),

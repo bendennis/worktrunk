@@ -47,6 +47,39 @@ impl Repository {
         branch.and_then(|branch| self.branch_marker(branch))
     }
 
+    // =========================================================================
+    // Branch parent (stacked branches)
+    // =========================================================================
+
+    /// Get the parent branch for stacked branch workflows.
+    ///
+    /// Stored as `worktrunk.state.<branch>.parent`. Returns `None` if no parent
+    /// is set or the config key doesn't exist.
+    pub fn branch_parent(&self, branch: &str) -> Option<String> {
+        let config_key = format!("worktrunk.state.{branch}.parent");
+        self.run_command(&["config", "--get", &config_key])
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    }
+
+    /// Set the parent branch for stacked branch workflows.
+    pub fn set_branch_parent(&self, branch: &str, parent: &str) -> anyhow::Result<()> {
+        let config_key = format!("worktrunk.state.{branch}.parent");
+        self.run_command(&["config", &config_key, parent])?;
+        Ok(())
+    }
+
+    /// Clear the parent branch for stacked branch workflows.
+    ///
+    /// Returns `true` if a parent was cleared, `false` if none was set.
+    pub fn clear_branch_parent(&self, branch: &str) -> anyhow::Result<bool> {
+        let config_key = format!("worktrunk.state.{branch}.parent");
+        Ok(self
+            .run_command(&["config", "--unset", &config_key])
+            .is_ok())
+    }
+
     /// Set the previous branch in worktrunk.history for `wt switch -` support.
     ///
     /// Stores the branch we're switching FROM, so `wt switch -` can return to it.
@@ -233,14 +266,30 @@ impl Repository {
     pub fn resolve_target_branch(&self, target: Option<&str>) -> anyhow::Result<String> {
         match target {
             Some(b) => self.resolve_worktree_name(b),
-            None => self.default_branch().ok_or_else(|| {
-                GitError::Other {
-                    message: cformat!(
-                        "Cannot determine default branch. Specify target explicitly or run <bold>wt config state default-branch set BRANCH</>"
-                    ),
+            None => {
+                // Check for stored parent branch (stacked branches)
+                if let Some(branch) = self.current_worktree().branch().ok().flatten() {
+                    if let Some(parent) = self.branch_parent(&branch) {
+                        if self.branch(&parent).exists().unwrap_or(false) {
+                            return Ok(parent);
+                        }
+                        log::debug!(
+                            "Stored parent '{}' for branch '{}' no longer exists, falling back to default branch",
+                            parent,
+                            branch
+                        );
+                    }
                 }
-                .into()
-            }),
+
+                self.default_branch().ok_or_else(|| {
+                    GitError::Other {
+                        message: cformat!(
+                            "Cannot determine default branch. Specify target explicitly or run <bold>wt config state default-branch set BRANCH</>"
+                        ),
+                    }
+                    .into()
+                })
+            }
         }
     }
 

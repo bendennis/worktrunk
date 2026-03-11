@@ -433,6 +433,35 @@ Without a subcommand, runs `get` for the current branch. For `--branch`, use `ge
         action: Option<MarkerAction>,
     },
 
+    /// Parent branch (stacked branches)
+    #[command(
+        after_long_help = r#"Tracks the parent branch for stacked branch workflows.
+
+When a parent is set, commands like `wt step rebase`, `wt step squash`, `wt merge`,
+and `wt step diff` automatically target the parent instead of the default branch.
+
+## How it works
+
+Set automatically when creating a branch with `--base`:
+
+```console
+wt switch -c feature-b --base feature-a
+```
+
+This records `feature-a` as the parent of `feature-b`. Then `wt step rebase` from
+`feature-b` rebases onto `feature-a` (not `main`).
+
+## Storage
+
+Stored in git config as `worktrunk.state.<branch>.parent`.
+
+Without a subcommand, runs `get` for the current branch."#
+    )]
+    Parent {
+        #[command(subcommand)]
+        action: Option<ParentAction>,
+    },
+
     /// Background operation logs
     #[command(after_long_help = r#"View and manage logs from background operations.
 
@@ -727,6 +756,76 @@ wt config state marker clear --all
         branch: Option<String>,
 
         /// Clear all markers
+        #[arg(long)]
+        all: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ParentAction {
+    /// Get parent for a branch
+    #[command(after_long_help = r#"## Examples
+
+Get parent for current branch:
+```console
+wt config state parent
+```
+
+Get parent for a specific branch:
+```console
+wt config state parent get --branch=feature-b
+```"#)]
+    Get {
+        /// Target branch (defaults to current)
+        #[arg(long, add = crate::completion::branch_value_completer())]
+        branch: Option<String>,
+    },
+
+    /// Set parent for a branch
+    #[command(after_long_help = r#"## Examples
+
+Set parent for current branch:
+```console
+wt config state parent set feature-a
+```
+
+Set parent for a specific branch:
+```console
+wt config state parent set feature-a --branch=feature-b
+```"#)]
+    Set {
+        /// Parent branch name
+        #[arg(add = crate::completion::branch_value_completer())]
+        value: String,
+
+        /// Target branch (defaults to current)
+        #[arg(long, add = crate::completion::branch_value_completer())]
+        branch: Option<String>,
+    },
+
+    /// Clear parent for a branch
+    #[command(after_long_help = r#"## Examples
+
+Clear parent for current branch:
+```console
+wt config state parent clear
+```
+
+Clear parent for a specific branch:
+```console
+wt config state parent clear --branch=feature-b
+```
+
+Clear all parents:
+```console
+wt config state parent clear --all
+```"#)]
+    Clear {
+        /// Target branch (defaults to current)
+        #[arg(long, add = crate::completion::branch_value_completer(), conflicts_with = "all")]
+        branch: Option<String>,
+
+        /// Clear all parent relationships
         #[arg(long)]
         all: bool,
     },

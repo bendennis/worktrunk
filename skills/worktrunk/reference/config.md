@@ -502,6 +502,7 @@ Usage: <b><span class=c>wt config state</span></b> <span class=c>[OPTIONS]</span
   <b><span class=c>previous-branch</span></b>  Previous branch (for <b>wt switch -</b>)
   <b><span class=c>ci-status</span></b>        CI status cache
   <b><span class=c>marker</span></b>           Branch markers
+  <b><span class=c>parent</span></b>           Parent branch (stacked branches)
   <b><span class=c>logs</span></b>             Background operation logs
   <b><span class=c>hints</span></b>            One-time hints shown in this repo
   <b><span class=c>get</span></b>              Get all stored state

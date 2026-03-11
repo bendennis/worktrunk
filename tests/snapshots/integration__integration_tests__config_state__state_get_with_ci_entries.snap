@@ -1,11 +1,15 @@
 ---
 source: tests/integration_tests/config_state.rs
+assertion_line: 737
 expression: "String::from_utf8_lossy(&output.stderr)"
 ---
 [36mDEFAULT BRANCH[39m
 [107m [0m main
 
 [36mPREVIOUS BRANCH[39m
+[107m [0m (none)
+
+[36mBRANCH PARENTS[39m
 [107m [0m (none)
 
 [36mBRANCH MARKERS[39m

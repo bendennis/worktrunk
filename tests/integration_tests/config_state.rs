@@ -686,6 +686,9 @@ fn test_state_get_empty(repo: TestRepo) {
         [36mPREVIOUS BRANCH[39m
         [107m [0m (none)
 
+        [36mBRANCH PARENTS[39m
+        [107m [0m (none)
+
         [36mBRANCH MARKERS[39m
         [107m [0m (none)
 
