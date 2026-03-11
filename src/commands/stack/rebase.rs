@@ -55,8 +55,9 @@ pub fn cascade_rebase(repo: &Repository, start_branch: Option<&str>) -> anyhow::
                 "Branch <bold>{child}</> lost its parent during cascade"
             ))?;
 
-        rebase_branch(repo, &child, &parent)?;
-        rebased_count += 1;
+        if rebase_branch(repo, &child, &parent)? {
+            rebased_count += 1;
+        }
 
         // Enqueue grandchildren
         if let Some(grandchildren) = children_map.get(&child) {
@@ -78,7 +79,8 @@ pub fn cascade_rebase(repo: &Repository, start_branch: Option<&str>) -> anyhow::
 }
 
 /// Rebase a single branch onto its parent in that branch's worktree.
-fn rebase_branch(repo: &Repository, branch: &str, parent: &str) -> anyhow::Result<()> {
+/// Returns `true` if a rebase was performed, `false` if already up-to-date.
+fn rebase_branch(repo: &Repository, branch: &str, parent: &str) -> anyhow::Result<bool> {
     let worktree_path = repo.worktree_for_branch(branch)?.ok_or_else(|| {
         anyhow::anyhow!(cformat!(
             "Branch <bold>{branch}</> has no worktree. Run <bold>wt switch {branch}</> first."
@@ -109,7 +111,7 @@ fn rebase_branch(repo: &Repository, branch: &str, parent: &str) -> anyhow::Resul
                     "<bold>{branch}</> already up-to-date with <bold>{parent}</>"
                 ))
             );
-            return Ok(());
+            return Ok(false);
         }
     }
 
@@ -141,5 +143,5 @@ fn rebase_branch(repo: &Repository, branch: &str, parent: &str) -> anyhow::Resul
         ));
     }
 
-    Ok(())
+    Ok(true)
 }
