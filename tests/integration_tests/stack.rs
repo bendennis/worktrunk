@@ -390,6 +390,190 @@ fn test_reparent_on_remove_detach(mut repo: TestRepo) {
     assert!(stdout.trim().is_empty(), "Expected no parent, got: {}", stdout.trim());
 }
 
+/// Linear cascade rebase: main → A → B, advance main, rebase from A
+#[rstest]
+fn test_stack_rebase_linear(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+    let b_path = repo.add_worktree("feature-b");
+
+    // Build stack: main → A → B, each with a commit
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+
+    fs::write(a_path.join("a.txt"), "feature a").unwrap();
+    repo.run_git_in(&a_path, &["add", "a.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "Add a.txt"]);
+
+    fs::write(b_path.join("b.txt"), "feature b").unwrap();
+    repo.run_git_in(&b_path, &["add", "b.txt"]);
+    repo.run_git_in(&b_path, &["commit", "-m", "Add b.txt"]);
+
+    // Advance main
+    let main_path = repo.root_path().to_path_buf();
+    fs::write(main_path.join("main-update.txt"), "main update").unwrap();
+    repo.run_git_in(&main_path, &["add", "main-update.txt"]);
+    repo.run_git_in(&main_path, &["commit", "-m", "Advance main"]);
+
+    // Rebase from A — should cascade to B
+    let settings = setup_snapshot_settings(&repo);
+    let _guard = settings.bind_to_scope();
+    assert_cmd_snapshot!(make_snapshot_cmd(
+        &repo,
+        "stack",
+        &["rebase"],
+        Some(&a_path),
+    ));
+
+    // Verify A has main-update.txt (rebased onto main)
+    assert!(a_path.join("main-update.txt").exists(), "A should have main-update.txt after rebase");
+
+    // Verify B has both main-update.txt and a.txt (cascaded rebase)
+    assert!(b_path.join("main-update.txt").exists(), "B should have main-update.txt after cascade");
+    assert!(b_path.join("a.txt").exists(), "B should have a.txt after cascade");
+}
+
+/// Rebase when already up-to-date is a no-op
+#[rstest]
+fn test_stack_rebase_up_to_date(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+
+    let settings = setup_snapshot_settings(&repo);
+    let _guard = settings.bind_to_scope();
+    assert_cmd_snapshot!(make_snapshot_cmd(
+        &repo,
+        "stack",
+        &["rebase"],
+        Some(&a_path),
+    ));
+}
+
+/// Rebase with branching: A → B, A → C, verify both children rebase
+#[rstest]
+fn test_stack_rebase_branching(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+    let b_path = repo.add_worktree("feature-b");
+    let c_path = repo.add_worktree("feature-c");
+
+    // Build: main → A → {B, C}
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&c_path)
+        .output()
+        .unwrap();
+
+    // Add commits to each child
+    fs::write(b_path.join("b.txt"), "b content").unwrap();
+    repo.run_git_in(&b_path, &["add", "b.txt"]);
+    repo.run_git_in(&b_path, &["commit", "-m", "Add b.txt"]);
+
+    fs::write(c_path.join("c.txt"), "c content").unwrap();
+    repo.run_git_in(&c_path, &["add", "c.txt"]);
+    repo.run_git_in(&c_path, &["commit", "-m", "Add c.txt"]);
+
+    // Advance A
+    fs::write(a_path.join("a-update.txt"), "a update").unwrap();
+    repo.run_git_in(&a_path, &["add", "a-update.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "Advance A"]);
+
+    // Rebase from A — both B and C should cascade
+    let output = repo
+        .wt_command()
+        .args(["stack", "rebase"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "Rebase should succeed");
+
+    // Both children should have A's update
+    assert!(b_path.join("a-update.txt").exists(), "B should have a-update.txt");
+    assert!(c_path.join("a-update.txt").exists(), "C should have a-update.txt");
+}
+
+/// Rebase fails when child has no worktree
+#[rstest]
+fn test_stack_rebase_missing_worktree(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+
+    // Set parent for a branch that exists but has no worktree
+    repo.run_git_in(repo.root_path(), &["branch", "orphan-branch"]);
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a", "--branch", "orphan-branch"])
+        .output()
+        .unwrap();
+
+    // Advance A so there's something to rebase
+    fs::write(a_path.join("a.txt"), "content").unwrap();
+    repo.run_git_in(&a_path, &["add", "a.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "advance a"]);
+
+    let settings = setup_snapshot_settings(&repo);
+    let _guard = settings.bind_to_scope();
+    assert_cmd_snapshot!(make_snapshot_cmd(
+        &repo,
+        "stack",
+        &["rebase"],
+        Some(&a_path),
+    ));
+}
+
+/// Rebase stops on conflict with helpful message
+#[rstest]
+fn test_stack_rebase_conflict(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+
+    // Create conflicting changes
+    let main_path = repo.root_path().to_path_buf();
+    fs::write(main_path.join("conflict.txt"), "main version").unwrap();
+    repo.run_git_in(&main_path, &["add", "conflict.txt"]);
+    repo.run_git_in(&main_path, &["commit", "-m", "Main conflict"]);
+
+    fs::write(a_path.join("conflict.txt"), "feature version").unwrap();
+    repo.run_git_in(&a_path, &["add", "conflict.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "Feature conflict"]);
+
+    // Rebase should fail with conflict info
+    let output = repo
+        .wt_command()
+        .args(["stack", "rebase"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success(), "Rebase should fail on conflict");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("conflict") || stderr.contains("Rebase"), "Should mention conflict: {stderr}");
+}
+
 /// `wt switch -c --base` automatically sets parent
 #[rstest]
 fn test_switch_create_with_base_sets_parent(mut repo: TestRepo) {

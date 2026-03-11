@@ -2,8 +2,10 @@
 //!
 //! - `show` — Visualize the branch stack as an ASCII tree
 //! - `set-parent` / `unset-parent` — Manage parent relationships
+//! - `rebase` — Cascade rebase through the stack
 
 pub(crate) mod lineage;
+mod rebase;
 mod show;
 
 use anyhow::{Context, bail};
@@ -21,6 +23,10 @@ pub fn handle_stack_command(cmd: StackCommand) -> anyhow::Result<()> {
         }
         StackCommand::SetParent { parent, branch } => set_parent(parent, branch),
         StackCommand::UnsetParent { branch } => unset_parent(branch),
+        StackCommand::Rebase { branch } => {
+            let repo = Repository::current()?;
+            rebase::cascade_rebase(&repo, branch.as_deref())
+        }
     }
 }
 

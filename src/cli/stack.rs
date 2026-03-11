@@ -73,4 +73,34 @@ wt stack unset-parent --branch feature-b
         #[arg(long, add = crate::completion::branch_value_completer())]
         branch: Option<String>,
     },
+
+    /// Rebase the stack from current branch down
+    ///
+    /// Rebases onto parent, then cascades to all descendants in topological order.
+    #[command(
+        after_long_help = r#"Rebases the current branch onto its parent, then cascades down through all descendants. Each branch is rebased in its own worktree.
+
+## Examples
+
+```console
+wt stack rebase                   # Rebase from current branch down
+wt stack rebase --branch feature  # Start from a specific branch
+```
+
+## Behavior
+
+1. Rebase current branch onto its parent (skipped if no parent)
+2. For each descendant (BFS order): rebase onto its parent
+3. On conflict: stop and report which worktree needs resolution
+
+After resolving conflicts, re-run `wt stack rebase` to continue — already-rebased branches are skipped.
+
+Every branch in the stack must have a worktree. Use `wt switch <branch>` to create missing worktrees before rebasing.
+"#
+    )]
+    Rebase {
+        /// Start from this branch instead of current
+        #[arg(long, add = crate::completion::branch_value_completer())]
+        branch: Option<String>,
+    },
 }
