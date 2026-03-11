@@ -5,8 +5,9 @@
 //! - `rebase` — Cascade rebase through the stack
 
 pub(crate) mod lineage;
-mod rebase;
+pub(crate) mod rebase;
 mod show;
+mod sync;
 
 use anyhow::{Context, bail};
 use color_print::cformat;
@@ -26,6 +27,10 @@ pub fn handle_stack_command(cmd: StackCommand) -> anyhow::Result<()> {
         StackCommand::Rebase { branch } => {
             let repo = Repository::current()?;
             rebase::cascade_rebase(&repo, branch.as_deref())
+        }
+        StackCommand::Sync { no_fetch, no_push } => {
+            let repo = Repository::current()?;
+            sync::stack_sync(&repo, no_fetch, no_push)
         }
     }
 }

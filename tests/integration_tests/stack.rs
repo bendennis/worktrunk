@@ -574,6 +574,160 @@ fn test_stack_rebase_conflict(mut repo: TestRepo) {
     assert!(stderr.contains("conflict") || stderr.contains("Rebase"), "Should mention conflict: {stderr}");
 }
 
+/// `wt stack sync --no-fetch --no-push` is equivalent to cascade rebase
+#[rstest]
+fn test_stack_sync_no_fetch_no_push(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+    let b_path = repo.add_worktree("feature-b");
+
+    // Build stack: main → A → B
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+
+    fs::write(a_path.join("a.txt"), "a").unwrap();
+    repo.run_git_in(&a_path, &["add", "a.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "Add a"]);
+
+    fs::write(b_path.join("b.txt"), "b").unwrap();
+    repo.run_git_in(&b_path, &["add", "b.txt"]);
+    repo.run_git_in(&b_path, &["commit", "-m", "Add b"]);
+
+    // Advance main
+    let main_path = repo.root_path().to_path_buf();
+    fs::write(main_path.join("update.txt"), "update").unwrap();
+    repo.run_git_in(&main_path, &["add", "update.txt"]);
+    repo.run_git_in(&main_path, &["commit", "-m", "Advance main"]);
+
+    let settings = setup_snapshot_settings(&repo);
+    let _guard = settings.bind_to_scope();
+    assert_cmd_snapshot!(make_snapshot_cmd(
+        &repo,
+        "stack",
+        &["sync", "--no-fetch", "--no-push"],
+        Some(&a_path),
+    ));
+
+    // Verify cascade worked
+    assert!(b_path.join("update.txt").exists(), "B should have update.txt");
+    assert!(b_path.join("a.txt").exists(), "B should have a.txt");
+}
+
+/// `wt stack sync` with remote: fetch, rebase, push
+#[rstest]
+fn test_stack_sync_with_remote(mut repo: TestRepo) {
+    repo.setup_remote("main");
+
+    let a_path = repo.add_worktree("feature-a");
+    let b_path = repo.add_worktree("feature-b");
+
+    // Build stack: main → A → B
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+
+    // Add commits
+    fs::write(a_path.join("a.txt"), "a").unwrap();
+    repo.run_git_in(&a_path, &["add", "a.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "Add a"]);
+
+    fs::write(b_path.join("b.txt"), "b").unwrap();
+    repo.run_git_in(&b_path, &["add", "b.txt"]);
+    repo.run_git_in(&b_path, &["commit", "-m", "Add b"]);
+
+    // Push branches to set up tracking
+    repo.run_git_in(&a_path, &["push", "-u", "origin", "feature-a"]);
+    repo.run_git_in(&b_path, &["push", "-u", "origin", "feature-b"]);
+
+    // Advance main
+    let main_path = repo.root_path().to_path_buf();
+    fs::write(main_path.join("update.txt"), "update").unwrap();
+    repo.run_git_in(&main_path, &["add", "update.txt"]);
+    repo.run_git_in(&main_path, &["commit", "-m", "Advance main"]);
+    repo.run_git_in(&main_path, &["push"]);
+
+    // Sync (fetch + rebase + push)
+    let output = repo
+        .wt_command()
+        .args(["stack", "sync"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "Sync should succeed: {}", String::from_utf8_lossy(&output.stderr));
+
+    // Verify cascade worked
+    assert!(b_path.join("update.txt").exists(), "B should have update.txt after sync");
+
+    // Verify branches were pushed (check remote has our commits)
+    let remote_log = std::process::Command::new("git")
+        .args(["log", "--oneline", "origin/feature-a"])
+        .current_dir(&main_path)
+        .output()
+        .unwrap();
+    let remote_a = String::from_utf8_lossy(&remote_log.stdout);
+    assert!(remote_a.contains("Add a"), "Remote should have feature-a commits");
+}
+
+/// `wt stack sync --no-push` fetches and rebases but skips push
+#[rstest]
+fn test_stack_sync_no_push(mut repo: TestRepo) {
+    repo.setup_remote("main");
+
+    let a_path = repo.add_worktree("feature-a");
+
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+
+    fs::write(a_path.join("a.txt"), "a").unwrap();
+    repo.run_git_in(&a_path, &["add", "a.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "Add a"]);
+
+    // Advance main and push
+    let main_path = repo.root_path().to_path_buf();
+    fs::write(main_path.join("update.txt"), "update").unwrap();
+    repo.run_git_in(&main_path, &["add", "update.txt"]);
+    repo.run_git_in(&main_path, &["commit", "-m", "Advance main"]);
+    repo.run_git_in(&main_path, &["push"]);
+
+    // Sync with --no-push
+    let output = repo
+        .wt_command()
+        .args(["stack", "sync", "--no-push"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "Sync should succeed");
+
+    // Verify rebase happened
+    assert!(a_path.join("update.txt").exists(), "A should have update.txt");
+
+    // Verify feature-a was NOT pushed (no tracking branch on remote)
+    let remote_refs = std::process::Command::new("git")
+        .args(["branch", "-r"])
+        .current_dir(&main_path)
+        .output()
+        .unwrap();
+    let remote_refs = String::from_utf8_lossy(&remote_refs.stdout);
+    assert!(!remote_refs.contains("feature-a"), "feature-a should not be on remote");
+}
+
 /// `wt switch -c --base` automatically sets parent
 #[rstest]
 fn test_switch_create_with_base_sets_parent(mut repo: TestRepo) {

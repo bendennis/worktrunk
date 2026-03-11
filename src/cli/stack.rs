@@ -103,4 +103,38 @@ Every branch in the stack must have a worktree. Use `wt switch <branch>` to crea
         #[arg(long, add = crate::completion::branch_value_completer())]
         branch: Option<String>,
     },
+
+    /// Fetch, rebase entire stack, and push each branch
+    ///
+    /// The everyday "update my stack" command: fetch, cascade rebase from root, push with --force-with-lease.
+    #[command(
+        after_long_help = r#"Fetches from the remote, rebases the entire stack from root down, then pushes each branch with `--force-with-lease`.
+
+## Examples
+
+```console
+wt stack sync                    # Full sync
+wt stack sync --no-push          # Rebase only, don't push
+wt stack sync --no-fetch         # Skip fetch (offline)
+```
+
+## Behavior
+
+1. `git fetch --prune` (unless `--no-fetch`)
+2. Cascade rebase from stack root (same as `wt stack rebase`)
+3. Push each branch with `--force-with-lease` (unless `--no-push`)
+   - Branches without an upstream get `-u origin <branch>` instead
+
+On conflict during rebase, sync stops. Resolve and re-run.
+"#
+    )]
+    Sync {
+        /// Skip fetch
+        #[arg(long)]
+        no_fetch: bool,
+
+        /// Skip push (rebase only)
+        #[arg(long)]
+        no_push: bool,
+    },
 }
