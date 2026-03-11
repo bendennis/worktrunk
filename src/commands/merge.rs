@@ -1,4 +1,5 @@
 use anyhow::Context;
+use color_print::cformat;
 use worktrunk::HookType;
 use worktrunk::config::{Approvals, UserConfig};
 use worktrunk::git::Repository;
@@ -229,6 +230,20 @@ pub fn handle_merge(opts: MergeOptions<'_>) -> anyhow::Result<()> {
             rebased,
         }),
     )?;
+
+    // Reparent children to target_branch (the grandparent from child's perspective)
+    let reparented = repo.reparent_children(&current_branch, Some(&target_branch))?;
+    if reparented > 0 {
+        eprintln!(
+            "{}",
+            info_message(cformat!(
+                "Reparented {reparented} child branch{} to <bold>{target_branch}</>",
+                if reparented == 1 { "" } else { "es" }
+            ))
+        );
+    }
+    // Clean up the merged branch's own parent
+    let _ = repo.clear_branch_parent(&current_branch);
 
     // Destination: prefer the target branch's worktree; fall back to home path.
     let destination_path = match target_worktree_path {

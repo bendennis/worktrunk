@@ -10,7 +10,9 @@ use worktrunk::git::{
     GitError, IntegrationReason, Repository, parse_porcelain_z, parse_untracked_files,
 };
 use worktrunk::path::format_path_for_display;
-use worktrunk::styling::{eprintln, format_with_gutter, progress_message, warning_message};
+use worktrunk::styling::{
+    eprintln, format_with_gutter, info_message, progress_message, warning_message,
+};
 
 /// Target for worktree removal.
 #[derive(Debug)]
@@ -95,6 +97,7 @@ impl RepositoryCliExt for Repository {
                         if !wt.path.exists() {
                             // Directory missing - prune and continue
                             self.prune_worktrees()?;
+                            reparent_before_removal(self, branch);
                             return Ok(RemoveResult::BranchOnly {
                                 branch_name: branch.to_string(),
                                 deletion_mode,
@@ -116,6 +119,7 @@ impl RepositoryCliExt for Repository {
                         // No worktree found - check if the branch exists locally
                         let branch_handle = self.branch(branch);
                         if branch_handle.exists_locally()? {
+                            reparent_before_removal(self, branch);
                             return Ok(RemoveResult::BranchOnly {
                                 branch_name: branch.to_string(),
                                 deletion_mode,
@@ -217,6 +221,11 @@ impl RepositoryCliExt for Repository {
             .run_command(&["rev-parse", "HEAD"])
             .ok()
             .map(|s| s.trim().to_string());
+
+        // Reparent children before removal
+        if let Some(branch) = &branch_name {
+            reparent_before_removal(self, branch);
+        }
 
         Ok(RemoveResult::RemovedWorktree {
             main_path,
@@ -371,6 +380,32 @@ fn compute_integration_reason(
     // On error, return None (informational only)
     let (_, reason) = repo.integration_reason(branch, target).ok()?;
     reason
+}
+
+/// Reparent children of a branch being removed.
+///
+/// If the branch has a stored parent, children are reparented to that parent
+/// (grandparent from child's perspective). If not, children are detached
+/// and will fall back to the default branch via `resolve_target_branch`.
+fn reparent_before_removal(repo: &Repository, branch: &str) {
+    let new_parent = repo.branch_parent(branch);
+    let reparented = repo
+        .reparent_children(branch, new_parent.as_deref())
+        .unwrap_or(0);
+    if reparented > 0 {
+        let target_msg = match &new_parent {
+            Some(p) => cformat!(" to <bold>{p}</>"),
+            None => String::new(),
+        };
+        eprintln!(
+            "{}",
+            info_message(cformat!(
+                "Reparented {reparented} child branch{}{target_msg}",
+                if reparented == 1 { "" } else { "es" }
+            ))
+        );
+    }
+    let _ = repo.clear_branch_parent(branch);
 }
 
 /// Warn about untracked files that will be auto-staged.

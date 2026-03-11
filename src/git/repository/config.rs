@@ -80,6 +80,45 @@ impl Repository {
             .is_ok())
     }
 
+    /// Find all branches that have `parent` as their parent.
+    pub fn branch_children(&self, parent: &str) -> Vec<String> {
+        self.run_command(&["config", "--get-regexp", r"^worktrunk\.state\..*\.parent$"])
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| {
+                let (key, value) = line.split_once(' ')?;
+                if value.trim() == parent {
+                    key.strip_prefix("worktrunk.state.")
+                        .and_then(|s| s.strip_suffix(".parent"))
+                        .map(String::from)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Reparent all children of `old_parent` to `new_parent`.
+    ///
+    /// If `new_parent` is `None`, clears the parent (detaches from stack).
+    /// Returns the number of children reparented.
+    pub fn reparent_children(
+        &self,
+        old_parent: &str,
+        new_parent: Option<&str>,
+    ) -> anyhow::Result<usize> {
+        let children = self.branch_children(old_parent);
+        for child in &children {
+            match new_parent {
+                Some(np) => self.set_branch_parent(child, np)?,
+                None => {
+                    self.clear_branch_parent(child)?;
+                }
+            }
+        }
+        Ok(children.len())
+    }
+
     /// Set the previous branch in worktrunk.history for `wt switch -` support.
     ///
     /// Stores the branch we're switching FROM, so `wt switch -` can return to it.
