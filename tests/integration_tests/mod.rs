@@ -53,6 +53,7 @@ pub mod shell_powershell;
 pub mod shell_wrapper;
 pub mod snapshot_formatting_guard;
 pub mod spacing_edge_cases;
+pub mod stack;
 pub mod statusline;
 pub mod step_alias;
 pub mod step_copy_ignored;
