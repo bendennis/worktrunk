@@ -52,9 +52,6 @@ pub fn stack_sync(
     // Step 4: Push each branch with --force-with-lease
     if !no_push {
         let branches = collect_stack_branches(repo, &root);
-        let mut pushed = 0usize;
-        let mut skipped = 0usize;
-
         for branch in &branches {
             if pruned.contains(branch) {
                 continue;
@@ -78,16 +75,13 @@ pub fn stack_sync(
                         "Pushing <bold>{branch}</> (setting upstream)..."
                     ))
                 );
-                match wt.run_command(&["push", "-u", "origin", branch]) {
-                    Ok(_) => pushed += 1,
-                    Err(e) => {
-                        eprintln!(
-                            "{}",
-                            warning_message(cformat!(
-                                "Failed to push <bold>{branch}</>: {e}"
-                            ))
-                        );
-                    }
+                if let Err(e) = wt.run_command(&["push", "-u", "origin", branch]) {
+                    eprintln!(
+                        "{}",
+                        warning_message(cformat!(
+                            "Failed to push <bold>{branch}</>: {e}"
+                        ))
+                    );
                 }
             } else {
                 // Check if local differs from upstream before pushing
@@ -101,7 +95,6 @@ pub fn stack_sync(
                     .map(|s| s.trim().to_string());
 
                 if local_sha.is_some() && local_sha == upstream_sha {
-                    skipped += 1;
                     continue;
                 }
 
@@ -112,36 +105,19 @@ pub fn stack_sync(
                         "Pushing <bold>{branch}</>..."
                     ))
                 );
-                match wt.run_command(&["push", "--force-with-lease"]) {
-                    Ok(_) => pushed += 1,
-                    Err(e) => {
-                        eprintln!(
-                            "{}",
-                            warning_message(cformat!(
-                                "Failed to push <bold>{branch}</>: {e}"
-                            ))
-                        );
-                    }
+                if let Err(e) = wt.run_command(&["push", "--force-with-lease"]) {
+                    eprintln!(
+                        "{}",
+                        warning_message(cformat!(
+                            "Failed to push <bold>{branch}</>: {e}"
+                        ))
+                    );
                 }
             }
         }
-
-        if pushed > 0 || skipped > 0 {
-            let mut parts = Vec::new();
-            if pushed > 0 {
-                parts.push(format!(
-                    "pushed {pushed} branch{}",
-                    if pushed == 1 { "" } else { "es" }
-                ));
-            }
-            if skipped > 0 {
-                parts.push(format!(
-                    "{skipped} already up-to-date",
-                ));
-            }
-            eprintln!("{}", success_message(cformat!("Sync complete: {}", parts.join(", "))));
-        }
     }
+
+    eprintln!("{}", success_message("Sync complete"));
 
     Ok(())
 }

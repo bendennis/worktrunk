@@ -1,6 +1,5 @@
 ---
 source: tests/integration_tests/stack.rs
-assertion_line: 789
 info:
   program: wt
   args:
@@ -49,3 +48,4 @@ exit_code: 0
 [2m↳[22m [2mTo remove, run [4mwt remove feature-a[24m[22m
 [36m◎[39m [36mRebasing [1mfeature-b[22m onto [1mmain[22m...[39m
 [32m✓[39m [32mRebased 1 descendant branch[39m
+[32m✓[39m [32mSync complete[39m
