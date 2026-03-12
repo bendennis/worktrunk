@@ -884,13 +884,20 @@ pub fn calculate_layout_with_width(
     url_template: Option<&str>,
 ) -> LayoutConfig {
     // Calculate actual widths for things we know
-    // Include branch names from both worktrees and standalone branches
-    let longest_branch = items
+    // Include branch names and parent suffix (` ← parent`) in width calculation
+    let max_branch = items
         .iter()
-        .filter_map(|item| item.branch.as_deref())
-        .max_by_key(|b| b.width());
-
-    let max_branch = longest_branch.map(|b| b.width()).unwrap_or(0);
+        .filter_map(|item| {
+            let branch = item.branch.as_deref()?;
+            let parent_width = item
+                .parent
+                .as_deref()
+                .map(|p| " ← ".width() + p.width())
+                .unwrap_or(0);
+            Some(branch.width() + parent_width)
+        })
+        .max()
+        .unwrap_or(0);
     let max_branch = fit_header(ColumnKind::Branch.header(), max_branch);
 
     let path_data_width = items
