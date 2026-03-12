@@ -858,14 +858,15 @@ fn test_stack_sync_prunes_multiple_integrated(mut repo: TestRepo) {
     repo.run_git_in(&main_path, &["merge", "feature-a", "--no-ff", "-m", "Merge A"]);
     repo.run_git_in(&main_path, &["merge", "feature-b", "--no-ff", "-m", "Merge B"]);
 
-    // Sync from C
-    let output = repo
-        .wt_command()
-        .args(["stack", "sync", "--no-fetch", "--no-push"])
-        .current_dir(&c_path)
-        .output()
-        .unwrap();
-    assert!(output.status.success(), "Sync should succeed: {}", String::from_utf8_lossy(&output.stderr));
+    // Sync from C — should detect A and B are integrated, reparent C to main
+    let settings = setup_snapshot_settings(&repo);
+    let _guard = settings.bind_to_scope();
+    assert_cmd_snapshot!(make_snapshot_cmd(
+        &repo,
+        "stack",
+        &["sync", "--no-fetch", "--no-push"],
+        Some(&c_path),
+    ));
 
     // C's parent should now be main (A and B both pruned)
     let output = repo
@@ -874,5 +875,5 @@ fn test_stack_sync_prunes_multiple_integrated(mut repo: TestRepo) {
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert_snapshot!(stdout.trim(), @"main");
+    assert_eq!(stdout.trim(), "main", "C should be reparented to main");
 }
