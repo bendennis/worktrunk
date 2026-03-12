@@ -174,12 +174,6 @@ fn prune_integrated_branches(
                     "<bold>{branch}</> integrated into <bold>{parent}</>{reparent_msg}"
                 ))
             );
-            eprintln!(
-                "{}",
-                hint_message(cformat!(
-                    "To remove, run <underline>wt remove {branch}</>"
-                ))
-            );
 
             pruned.insert(branch.clone());
         }
@@ -188,6 +182,18 @@ fn prune_integrated_branches(
         if let Some(children) = children_map.get(&branch) {
             queue.extend(children.iter().cloned());
         }
+    }
+
+    if !pruned.is_empty() {
+        let mut sorted: Vec<&str> = pruned.iter().map(|s| s.as_str()).collect();
+        sorted.sort();
+        let branch_list = sorted.join(" ");
+        eprintln!(
+            "{}",
+            hint_message(cformat!(
+                "To remove, run <underline>wt remove {branch_list}</>"
+            ))
+        );
     }
 
     Ok(pruned)
