@@ -74,36 +74,6 @@ wt stack unset-parent --branch feature-b
         branch: Option<String>,
     },
 
-    /// Rebase the stack from current branch down
-    ///
-    /// Rebases onto parent, then cascades to all descendants in topological order.
-    #[command(
-        after_long_help = r#"Rebases the current branch onto its parent, then cascades down through all descendants. Each branch is rebased in its own worktree.
-
-## Examples
-
-```console
-wt stack rebase                   # Rebase from current branch down
-wt stack rebase --branch feature  # Start from a specific branch
-```
-
-## Behavior
-
-1. Rebase current branch onto its parent (skipped if no parent)
-2. For each descendant (BFS order): rebase onto its parent
-3. On conflict: stop and report which worktree needs resolution
-
-After resolving conflicts, re-run `wt stack rebase` to continue — already-rebased branches are skipped.
-
-Every branch in the stack must have a worktree. Use `wt switch <branch>` to create missing worktrees before rebasing.
-"#
-    )]
-    Rebase {
-        /// Start from this branch instead of current
-        #[arg(long, add = crate::completion::branch_value_completer())]
-        branch: Option<String>,
-    },
-
     /// Fetch, rebase entire stack, and push each branch
     ///
     /// The everyday "update my stack" command: fetch, cascade rebase from root, push with --force-with-lease.
@@ -121,11 +91,14 @@ wt stack sync --no-fetch         # Skip fetch (offline)
 ## Behavior
 
 1. `git fetch --prune` (unless `--no-fetch`)
-2. Cascade rebase from stack root (same as `wt stack rebase`)
-3. Push each branch with `--force-with-lease` (unless `--no-push`)
+2. Detect and prune branches integrated into their parent (reparents children)
+3. Cascade rebase from stack root through all descendants
+4. Push each branch with `--force-with-lease` (unless `--no-push`)
    - Branches without an upstream get `-u origin <branch>` instead
 
-On conflict during rebase, sync stops. Resolve and re-run.
+On conflict during rebase, sync stops. Resolve conflicts and run `git rebase --continue`, then re-run `wt stack sync`.
+
+Every branch in the stack must have a worktree. Use `wt switch <branch>` to create missing worktrees before syncing.
 "#
     )]
     Sync {

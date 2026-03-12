@@ -1,11 +1,12 @@
 ---
 source: tests/integration_tests/stack.rs
-assertion_line: 535
 info:
   program: wt
   args:
     - stack
-    - rebase
+    - sync
+    - "--no-fetch"
+    - "--no-push"
   env:
     APPDATA: "[TEST_CONFIG_HOME]"
     CLICOLOR_FORCE: "1"
@@ -38,9 +39,10 @@ info:
     WORKTRUNK_TEST_SKIP_URL_HEALTH_CHECK: "1"
     XDG_CONFIG_HOME: "[TEST_CONFIG_HOME]"
 ---
-success: false
-exit_code: 1
+success: true
+exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-[31m✗[39m [31mBranch [1morphan-branch[22m has no worktree. Run [1mwt switch orphan-branch[22m first.[39m
+[2m○[22m [1morphan-branch[22m integrated into [1mfeature-a[22m
+[2m↳[22m [2mTo remove, run [4mwt remove orphan-branch[24m[22m

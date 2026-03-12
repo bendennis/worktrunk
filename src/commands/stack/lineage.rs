@@ -1,6 +1,6 @@
 //! Shared lineage utilities for stacked branch tree-walking.
 //!
-//! Used by `wt stack show` and `wt stack rebase` (Phase 4).
+//! Used by `wt stack show` and `wt stack sync`.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 

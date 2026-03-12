@@ -1,4 +1,4 @@
-//! `wt stack rebase` — cascade rebase through the stack.
+//! Cascade rebase through the stack.
 //!
 //! Rebases the current branch onto its parent, then cascades down to all
 //! descendants in BFS order. Each rebase runs in the branch's worktree.

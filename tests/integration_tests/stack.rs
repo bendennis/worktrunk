@@ -428,7 +428,7 @@ fn test_stack_rebase_linear(mut repo: TestRepo) {
     assert_cmd_snapshot!(make_snapshot_cmd(
         &repo,
         "stack",
-        &["rebase"],
+        &["sync", "--no-fetch", "--no-push"],
         Some(&a_path),
     ));
 
@@ -456,7 +456,7 @@ fn test_stack_rebase_up_to_date(mut repo: TestRepo) {
     assert_cmd_snapshot!(make_snapshot_cmd(
         &repo,
         "stack",
-        &["rebase"],
+        &["sync", "--no-fetch", "--no-push"],
         Some(&a_path),
     ));
 }
@@ -502,7 +502,7 @@ fn test_stack_rebase_branching(mut repo: TestRepo) {
     // Rebase from A — both B and C should cascade
     let output = repo
         .wt_command()
-        .args(["stack", "rebase"])
+        .args(["stack", "sync", "--no-fetch", "--no-push"])
         .current_dir(&a_path)
         .output()
         .unwrap();
@@ -535,7 +535,7 @@ fn test_stack_rebase_missing_worktree(mut repo: TestRepo) {
     assert_cmd_snapshot!(make_snapshot_cmd(
         &repo,
         "stack",
-        &["rebase"],
+        &["sync", "--no-fetch", "--no-push"],
         Some(&a_path),
     ));
 }
@@ -564,7 +564,7 @@ fn test_stack_rebase_conflict(mut repo: TestRepo) {
     // Rebase should fail with conflict info
     let output = repo
         .wt_command()
-        .args(["stack", "rebase"])
+        .args(["stack", "sync", "--no-fetch", "--no-push"])
         .current_dir(&a_path)
         .output()
         .unwrap();
