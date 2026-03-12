@@ -90,7 +90,22 @@ pub fn stack_sync(
                     }
                 }
             } else {
-                // Has upstream — force-with-lease (safe for post-rebase)
+                // Check if local differs from upstream before pushing
+                let local_sha = wt
+                    .run_command(&["rev-parse", "HEAD"])
+                    .ok()
+                    .map(|s| s.trim().to_string());
+                let upstream_sha = wt
+                    .run_command(&["rev-parse", &format!("{branch}@{{u}}")])
+                    .ok()
+                    .map(|s| s.trim().to_string());
+
+                if local_sha.is_some() && local_sha == upstream_sha {
+                    skipped += 1;
+                    continue;
+                }
+
+                // Has upstream but differs — force-with-lease (safe for post-rebase)
                 eprintln!(
                     "{}",
                     progress_message(cformat!(
@@ -100,18 +115,12 @@ pub fn stack_sync(
                 match wt.run_command(&["push", "--force-with-lease"]) {
                     Ok(_) => pushed += 1,
                     Err(e) => {
-                        // Check if already up-to-date
-                        let err_str = e.to_string();
-                        if err_str.contains("Everything up-to-date") {
-                            skipped += 1;
-                        } else {
-                            eprintln!(
-                                "{}",
-                                warning_message(cformat!(
-                                    "Failed to push <bold>{branch}</>: {e}"
-                                ))
-                            );
-                        }
+                        eprintln!(
+                            "{}",
+                            warning_message(cformat!(
+                                "Failed to push <bold>{branch}</>: {e}"
+                            ))
+                        );
                     }
                 }
             }
