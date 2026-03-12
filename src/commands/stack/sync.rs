@@ -9,8 +9,28 @@ use worktrunk::styling::{
     eprintln, hint_message, info_message, progress_message, success_message, warning_message,
 };
 
-use super::lineage::{collect_descendants, find_stack_root};
+use super::lineage::collect_descendants;
 use super::rebase::cascade_rebase;
+
+/// Find the topmost branch in the current branch's lineage that still has a
+/// parent (i.e., the first branch after the root). For `main → A → B → C`,
+/// calling from C returns A.
+///
+/// Returns `None` if the current branch *is* the root (has no parent).
+fn find_stack_base(repo: &Repository, branch: &str) -> Option<String> {
+    let mut current = branch.to_string();
+    let mut child_of_root = None;
+    let mut seen = std::collections::HashSet::new();
+    seen.insert(current.clone());
+    while let Some(parent) = repo.branch_parent(&current) {
+        if !seen.insert(parent.clone()) {
+            break;
+        }
+        child_of_root = Some(current);
+        current = parent;
+    }
+    child_of_root
+}
 
 pub fn stack_sync(
     repo: &Repository,
@@ -24,7 +44,8 @@ pub fn stack_sync(
         .flatten()
         .context("Cannot determine current branch (detached HEAD?)")?;
 
-    let root = find_stack_root(repo, &current_branch);
+    let stack_base = find_stack_base(repo, &current_branch)
+        .context("Current branch is not part of a stack (no parent set)")?;
 
     // Step 1: Fetch
     if !no_fetch {
@@ -44,14 +65,19 @@ pub fn stack_sync(
     }
 
     // Step 2: Prune integrated branches from the stack
-    let pruned = prune_integrated_branches(repo, &root)?;
+    let pruned = prune_integrated_branches(repo, &stack_base)?;
 
-    // Step 3: Cascade rebase from root
-    cascade_rebase(repo, Some(&root))?;
+    // Re-resolve stack base after pruning — parent relationships may have changed
+    // (e.g., if the stack base itself was integrated and its children reparented)
+    let stack_base = find_stack_base(repo, &current_branch)
+        .context("All stack branches have been integrated")?;
+
+    // Step 3: Cascade rebase from stack base
+    cascade_rebase(repo, Some(&stack_base))?;
 
     // Step 4: Push each branch with --force-with-lease
     if !no_push {
-        let branches = collect_stack_branches(repo, &root);
+        let branches = collect_stack_branches(repo, &stack_base);
         for branch in &branches {
             if pruned.contains(branch) {
                 continue;
@@ -132,8 +158,9 @@ fn prune_integrated_branches(
     let children_map = collect_descendants(repo, root);
     let mut pruned = HashSet::new();
 
-    // BFS from root, checking each non-root branch
+    // Check root itself (it has a parent since it's the stack base, not main)
     let mut queue: VecDeque<String> = VecDeque::new();
+    queue.push_back(root.to_string());
     if let Some(children) = children_map.get(root) {
         queue.extend(children.iter().cloned());
     }

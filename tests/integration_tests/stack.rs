@@ -518,6 +518,12 @@ fn test_stack_rebase_branching(mut repo: TestRepo) {
 fn test_stack_rebase_missing_worktree(mut repo: TestRepo) {
     let a_path = repo.add_worktree("feature-a");
 
+    // Set feature-a's parent to main so it's part of a stack
+    repo.wt_command()
+        .args(["stack", "set-parent", "main", "--branch", "feature-a"])
+        .output()
+        .unwrap();
+
     // Set parent for a branch that exists but has no worktree
     repo.run_git_in(repo.root_path(), &["branch", "orphan-branch"]);
     repo.wt_command()

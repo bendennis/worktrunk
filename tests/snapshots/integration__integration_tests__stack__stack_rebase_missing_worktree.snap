@@ -46,4 +46,5 @@ exit_code: 0
 ----- stderr -----
 [2m○[22m [1morphan-branch[22m integrated into [1mfeature-a[22m
 [2m↳[22m [2mTo remove, run [4mwt remove orphan-branch[24m[22m
+[2m○[22m [1mfeature-a[22m already up-to-date with [1mmain[22m
 [32m✓[39m [32mSync complete[39m
