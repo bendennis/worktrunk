@@ -364,7 +364,7 @@ fn test_reparent_on_remove(mut repo: TestRepo) {
 /// Reparenting on remove with no grandparent: A → B, remove A, B detached
 #[rstest]
 fn test_reparent_on_remove_detach(mut repo: TestRepo) {
-    let a_path = repo.add_worktree("feature-a");
+    repo.add_worktree("feature-a");
     let b_path = repo.add_worktree("feature-b");
 
     // Stack B on A, but A has no parent
@@ -748,4 +748,131 @@ fn test_switch_create_with_base_sets_parent(mut repo: TestRepo) {
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert_snapshot!(stdout.trim(), @"feature");
+}
+
+/// `wt stack sync` prunes integrated branches and reparents children.
+/// Simulates: main → A → B, A gets merged into main, sync detects and reparents B to main.
+#[rstest]
+fn test_stack_sync_prunes_integrated_branch(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+    let b_path = repo.add_worktree("feature-b");
+
+    // Build stack: main → A → B
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+
+    // Add a commit on A
+    fs::write(a_path.join("a.txt"), "feature a content").unwrap();
+    repo.run_git_in(&a_path, &["add", "a.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "Add feature a"]);
+
+    // Add a commit on B
+    fs::write(b_path.join("b.txt"), "feature b content").unwrap();
+    repo.run_git_in(&b_path, &["add", "b.txt"]);
+    repo.run_git_in(&b_path, &["commit", "-m", "Add feature b"]);
+
+    // Simulate A being merged into main (cherry-pick A's commit onto main)
+    let main_path = repo.root_path().to_path_buf();
+    repo.run_git_in(&main_path, &["merge", "feature-a", "--no-ff", "-m", "Merge feature-a"]);
+
+    // Sync from B — should detect A is integrated into main, reparent B to main
+    let settings = setup_snapshot_settings(&repo);
+    let _guard = settings.bind_to_scope();
+    assert_cmd_snapshot!(make_snapshot_cmd(
+        &repo,
+        "stack",
+        &["sync", "--no-fetch", "--no-push"],
+        Some(&b_path),
+    ));
+
+    // Verify B's parent is now main (reparented from A)
+    let output = repo
+        .wt_command()
+        .args(["config", "state", "parent", "get", "--branch", "feature-b"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout.trim(), "main", "B should be reparented to main");
+
+    // Verify A has no parent (cleared)
+    let output = repo
+        .wt_command()
+        .args(["config", "state", "parent", "get", "--branch", "feature-a"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.trim().is_empty(), "A should have no parent after pruning, got: {}", stdout.trim());
+
+    // Verify B has A's file (rebase cascaded correctly)
+    assert!(b_path.join("a.txt").exists(), "B should have a.txt after rebase onto main");
+}
+
+/// `wt stack sync` prunes multiple integrated branches in a chain.
+/// Simulates: main → A → B → C, both A and B merged into main.
+#[rstest]
+fn test_stack_sync_prunes_multiple_integrated(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+    let b_path = repo.add_worktree("feature-b");
+    let c_path = repo.add_worktree("feature-c");
+
+    // Build stack: main → A → B → C
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-b"])
+        .current_dir(&c_path)
+        .output()
+        .unwrap();
+
+    // Add commits
+    fs::write(a_path.join("a.txt"), "a").unwrap();
+    repo.run_git_in(&a_path, &["add", "a.txt"]);
+    repo.run_git_in(&a_path, &["commit", "-m", "Add a"]);
+
+    fs::write(b_path.join("b.txt"), "b").unwrap();
+    repo.run_git_in(&b_path, &["add", "b.txt"]);
+    repo.run_git_in(&b_path, &["commit", "-m", "Add b"]);
+
+    fs::write(c_path.join("c.txt"), "c").unwrap();
+    repo.run_git_in(&c_path, &["add", "c.txt"]);
+    repo.run_git_in(&c_path, &["commit", "-m", "Add c"]);
+
+    // Merge both A and B into main
+    let main_path = repo.root_path().to_path_buf();
+    repo.run_git_in(&main_path, &["merge", "feature-a", "--no-ff", "-m", "Merge A"]);
+    repo.run_git_in(&main_path, &["merge", "feature-b", "--no-ff", "-m", "Merge B"]);
+
+    // Sync from C
+    let output = repo
+        .wt_command()
+        .args(["stack", "sync", "--no-fetch", "--no-push"])
+        .current_dir(&c_path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "Sync should succeed: {}", String::from_utf8_lossy(&output.stderr));
+
+    // C's parent should now be main (A and B both pruned)
+    let output = repo
+        .wt_command()
+        .args(["config", "state", "parent", "get", "--branch", "feature-c"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_snapshot!(stdout.trim(), @"main");
 }

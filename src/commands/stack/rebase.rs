@@ -27,13 +27,6 @@ pub fn cascade_rebase(repo: &Repository, start_branch: Option<&str>) -> anyhow::
     // Step 1: Rebase start branch onto its parent (if it has one)
     if let Some(parent) = repo.branch_parent(&branch) {
         rebase_branch(repo, &branch, &parent)?;
-    } else {
-        eprintln!(
-            "{}",
-            info_message(cformat!(
-                "<bold>{branch}</> has no parent, skipping self-rebase"
-            ))
-        );
     }
 
     // Step 2: BFS cascade through descendants

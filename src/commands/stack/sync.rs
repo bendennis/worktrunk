@@ -1,11 +1,13 @@
 //! `wt stack sync` — fetch, cascade rebase, push entire stack.
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 use anyhow::Context;
 use color_print::cformat;
 use worktrunk::git::Repository;
-use worktrunk::styling::{eprintln, progress_message, success_message, warning_message};
+use worktrunk::styling::{
+    eprintln, hint_message, info_message, progress_message, success_message, warning_message,
+};
 
 use super::lineage::{collect_descendants, find_stack_root};
 use super::rebase::cascade_rebase;
@@ -41,16 +43,22 @@ pub fn stack_sync(
         }
     }
 
-    // Step 2: Cascade rebase from root
+    // Step 2: Prune integrated branches from the stack
+    let pruned = prune_integrated_branches(repo, &root)?;
+
+    // Step 3: Cascade rebase from root
     cascade_rebase(repo, Some(&root))?;
 
-    // Step 3: Push each branch with --force-with-lease
+    // Step 4: Push each branch with --force-with-lease
     if !no_push {
         let branches = collect_stack_branches(repo, &root);
         let mut pushed = 0usize;
         let mut skipped = 0usize;
 
         for branch in &branches {
+            if pruned.contains(branch) {
+                continue;
+            }
             let wt_path = match repo.worktree_for_branch(branch)? {
                 Some(p) => p,
                 None => continue,
@@ -127,6 +135,77 @@ pub fn stack_sync(
     }
 
     Ok(())
+}
+
+/// Detect and prune branches that have been integrated into their parent
+/// (e.g., merged on GitHub). Reparents children to the integrated branch's
+/// parent, keeping the stack intact. Returns the set of pruned branch names.
+fn prune_integrated_branches(
+    repo: &Repository,
+    root: &str,
+) -> anyhow::Result<HashSet<String>> {
+    let children_map = collect_descendants(repo, root);
+    let mut pruned = HashSet::new();
+
+    // BFS from root, checking each non-root branch
+    let mut queue: VecDeque<String> = VecDeque::new();
+    if let Some(children) = children_map.get(root) {
+        queue.extend(children.iter().cloned());
+    }
+
+    while let Some(branch) = queue.pop_front() {
+        // Look up the current parent (may have been reparented by a previous iteration)
+        let Some(parent) = repo.branch_parent(&branch) else {
+            // Enqueue children even if this branch has no parent
+            if let Some(children) = children_map.get(&branch) {
+                queue.extend(children.iter().cloned());
+            }
+            continue;
+        };
+
+        // Check if branch is integrated into its parent
+        let is_integrated = repo
+            .integration_reason(&branch, &parent)
+            .ok()
+            .and_then(|(_, reason)| reason)
+            .is_some();
+
+        if is_integrated {
+            let reparented = repo.reparent_children(&branch, Some(&parent))?;
+            let _ = repo.clear_branch_parent(&branch);
+
+            let reparent_msg = if reparented > 0 {
+                cformat!(
+                    "; reparented {reparented} child branch{} to <bold>{parent}</>",
+                    if reparented == 1 { "" } else { "es" }
+                )
+            } else {
+                String::new()
+            };
+
+            eprintln!(
+                "{}",
+                info_message(cformat!(
+                    "<bold>{branch}</> integrated into <bold>{parent}</>{reparent_msg}"
+                ))
+            );
+            eprintln!(
+                "{}",
+                hint_message(cformat!(
+                    "To remove, run <underline>wt remove {branch}</>"
+                ))
+            );
+
+            pruned.insert(branch.clone());
+        }
+
+        // Always enqueue children (they may have been reparented but still need visiting)
+        if let Some(children) = children_map.get(&branch) {
+            queue.extend(children.iter().cloned());
+        }
+    }
+
+    Ok(pruned)
 }
 
 /// Collect all branches in the stack starting from root, BFS order.
