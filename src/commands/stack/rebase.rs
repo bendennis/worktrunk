@@ -40,7 +40,6 @@ pub fn cascade_rebase(repo: &Repository, start_branch: Option<&str>) -> anyhow::
         queue.extend(children.iter().cloned());
     }
 
-    let mut rebased_count = 0usize;
     while let Some(child) = queue.pop_front() {
         let parent = repo
             .branch_parent(&child)
@@ -49,23 +48,18 @@ pub fn cascade_rebase(repo: &Repository, start_branch: Option<&str>) -> anyhow::
             ))?;
 
         if rebase_branch(repo, &child, &parent)? {
-            rebased_count += 1;
+            eprintln!(
+                "{}",
+                success_message(cformat!(
+                    "Rebased <bold>{child}</> onto <bold>{parent}</>"
+                ))
+            );
         }
 
         // Enqueue grandchildren
         if let Some(grandchildren) = children_map.get(&child) {
             queue.extend(grandchildren.iter().cloned());
         }
-    }
-
-    if rebased_count > 0 {
-        eprintln!(
-            "{}",
-            success_message(cformat!(
-                "Rebased {rebased_count} descendant branch{}",
-                if rebased_count == 1 { "" } else { "es" }
-            ))
-        );
     }
 
     Ok(())

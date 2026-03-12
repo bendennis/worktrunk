@@ -45,6 +45,7 @@ exit_code: 0
 
 ----- stderr -----
 [36m◎[39m [36mRebasing [1mfeature-a[22m onto [1mmain[22m...[39m
+[32m✓[39m [32mRebased [1mfeature-a[22m onto [1mmain[22m[39m
 [36m◎[39m [36mRebasing [1mfeature-b[22m onto [1mfeature-a[22m...[39m
-[32m✓[39m [32mRebased 2 descendant branches[39m
+[32m✓[39m [32mRebased [1mfeature-b[22m onto [1mfeature-a[22m[39m
 [32m✓[39m [32mSync complete[39m
