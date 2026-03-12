@@ -251,12 +251,20 @@ fn test_stack_set_parent_branch_flag(mut repo: TestRepo) {
 /// `wt list --format=json` includes parent field
 #[rstest]
 fn test_list_json_includes_parent(mut repo: TestRepo) {
-    let feature_path = repo.add_worktree("feature");
+    let feature_a_path = repo.add_worktree("feature-a");
+    let feature_b_path = repo.add_worktree("feature-b");
 
-    // Set parent
+    // Set feature-a's parent to main (default branch — should be hidden in output)
     repo.wt_command()
         .args(["stack", "set-parent", "main"])
-        .current_dir(&feature_path)
+        .current_dir(&feature_a_path)
+        .output()
+        .unwrap();
+
+    // Set feature-b's parent to feature-a (non-default — should appear in output)
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&feature_b_path)
         .output()
         .unwrap();
 
@@ -270,20 +278,25 @@ fn test_list_json_includes_parent(mut repo: TestRepo) {
     let items: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     let items = items.as_array().unwrap();
 
-    // Find the feature item
-    let feature_item = items
+    // feature-a: parent is default branch (main), so it's omitted
+    let feature_a = items
         .iter()
-        .find(|item| item["branch"].as_str() == Some("feature"))
-        .expect("feature branch should be in list output");
+        .find(|item| item["branch"].as_str() == Some("feature-a"))
+        .expect("feature-a should be in list output");
+    assert!(feature_a.get("parent").is_none(), "default branch parent should be hidden");
 
-    assert_eq!(feature_item["parent"].as_str(), Some("main"));
+    // feature-b: parent is feature-a (non-default), so it's shown
+    let feature_b = items
+        .iter()
+        .find(|item| item["branch"].as_str() == Some("feature-b"))
+        .expect("feature-b should be in list output");
+    assert_eq!(feature_b["parent"].as_str(), Some("feature-a"));
 
     // Main should not have a parent field
     let main_item = items
         .iter()
         .find(|item| item["branch"].as_str() == Some("main"))
         .expect("main branch should be in list output");
-
     assert!(main_item.get("parent").is_none());
 }
 

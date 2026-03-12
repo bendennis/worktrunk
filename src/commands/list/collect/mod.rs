@@ -505,7 +505,15 @@ pub fn collect(
                 is_orphan: None,
                 upstream: None,
                 pr_status: None,
-                parent: wt.branch.as_ref().and_then(|b| repo.branch_parent(b)),
+                parent: wt.branch.as_ref().and_then(|b| {
+                    let p = repo.branch_parent(b)?;
+                    // Hide default branch parent in display — it's the implicit default
+                    if default_branch.as_deref() == Some(p.as_str()) {
+                        None
+                    } else {
+                        Some(p)
+                    }
+                }),
                 url: None,
                 url_active: None,
                 summary: None,
