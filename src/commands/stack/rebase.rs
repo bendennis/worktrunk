@@ -127,12 +127,12 @@ fn rebase_branch(repo: &Repository, branch: &str, parent: &str) -> anyhow::Resul
 
         if is_rebasing {
             bail!(cformat!(
-                "Rebase conflict in <bold>{branch}</>. Resolve in:\n  {}\nThen re-run <bold>wt stack rebase</> to continue.",
+                "Rebase conflict in <bold>{branch}</>. Resolve in:\n  {}\nThen re-run <bold>wt stack sync</> to continue.",
                 worktree_path.display()
             ));
         }
         return Err(e).context(cformat!(
-            "Failed to rebase <bold>{branch}</> onto <bold>{parent}</>"
+            "Failed to rebase <bold>{branch}</> onto <bold>{parent}</>\nResolve conflicts, then re-run <bold>wt stack sync</>"
         ));
     }
 
