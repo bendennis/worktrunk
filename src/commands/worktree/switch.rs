@@ -126,7 +126,6 @@ fn resolve_fork_ref(
                 method: CreationMethod::Regular {
                     create_branch: false,
                     base_branch: None,
-                    explicit_base: false,
                 },
             });
         }
@@ -149,8 +148,7 @@ fn resolve_fork_ref(
                         method: CreationMethod::Regular {
                             create_branch: false,
                             base_branch: None,
-                            explicit_base: false,
-                        },
+                                },
                     });
                 }
                 // Prefixed branch exists but tracks something else - error
@@ -325,7 +323,6 @@ fn resolve_same_repo_ref(
         method: CreationMethod::Regular {
             create_branch: false,
             base_branch: None,
-            explicit_base: false,
         },
     })
 }
@@ -419,7 +416,6 @@ fn resolve_switch_target(
     }
 
     // Compute base branch for creation
-    let explicit_base = resolved_base.is_some();
     let base_branch = if create {
         resolved_base.or_else(|| {
             // Check for invalid configured default branch
@@ -450,7 +446,6 @@ fn resolve_switch_target(
         method: CreationMethod::Regular {
             create_branch: create,
             base_branch,
-            explicit_base,
         },
     })
 }
@@ -720,7 +715,6 @@ pub fn execute_switch(
                 CreationMethod::Regular {
                     create_branch,
                     base_branch,
-                    explicit_base,
                 } => {
                     // Check if local branch exists BEFORE git worktree add (for DWIM detection)
                     let branch_handle = repo.branch(&branch);
@@ -791,8 +785,8 @@ pub fn execute_switch(
                         branch_handle.unset_upstream()?;
                     }
 
-                    // Persist parent for stacked branch workflows when --base was explicit
-                    if *create_branch && *explicit_base {
+                    // Persist parent for stacked branch workflows
+                    if *create_branch {
                         if let Some(base) = base_branch {
                             let _ = repo.set_branch_parent(&branch, base);
                         }

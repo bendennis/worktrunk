@@ -63,8 +63,6 @@ pub enum CreationMethod {
         create_branch: bool,
         /// Base branch for creation (resolved, validated to exist)
         base_branch: Option<String>,
-        /// True if `--base` was explicitly provided (sets parent for stacked branches)
-        explicit_base: bool,
     },
     /// Fork PR/MR: fetch from refs/pull/N/head or refs/merge-requests/N/head,
     /// create branch, configure pushRemote.
