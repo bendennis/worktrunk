@@ -1,6 +1,5 @@
 ---
 source: tests/integration_tests/stack.rs
-assertion_line: 16
 info:
   program: wt
   args:
@@ -41,6 +40,6 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-[1mfeature[22m  [2m← you are here[22m
 
 ----- stderr -----
+No stacked branches found. Use `wt switch -c <branch> --base <parent>` to create one.

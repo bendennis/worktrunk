@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use color_print::cformat;
 use worktrunk::git::Repository;
 
-use super::lineage::{collect_descendants, find_all_roots, find_stack_root};
+use super::lineage::{collect_descendants, find_all_roots, find_stack_scope};
 
 /// Render the stack tree containing the current branch.
 pub fn show_stack(repo: &Repository, all: bool) -> anyhow::Result<()> {
@@ -18,20 +18,21 @@ pub fn show_stack(repo: &Repository, all: bool) -> anyhow::Result<()> {
     if all {
         show_all_stacks(repo, current_branch.as_deref())?;
     } else {
-        let root = match &current_branch {
-            Some(branch) => find_stack_root(repo, branch),
-            None => {
-                // Detached HEAD — try to show from default branch
-                repo.default_branch().ok_or_else(|| {
-                    anyhow::anyhow!("Cannot determine current branch or default branch")
-                })?
-            }
+        let Some(branch) = &current_branch else {
+            // Detached HEAD
+            eprintln!("No stacked branches found (detached HEAD).");
+            return Ok(());
         };
-        let children_map = collect_descendants(repo, &root);
-        if children_map.is_empty() && current_branch.as_deref() != Some(&root) {
+
+        let Some((root, stack_base)) = find_stack_scope(repo, branch) else {
             eprintln!("No stacked branches found. Use `wt switch -c <branch> --base <parent>` to create one.");
             return Ok(());
-        }
+        };
+
+        // Collect descendants only from the stack base, then add root → [stack_base]
+        // so the tree shows root for context but excludes sibling stacks
+        let mut children_map = collect_descendants(repo, &stack_base);
+        children_map.insert(root.clone(), vec![stack_base]);
         render_tree(&root, &children_map, current_branch.as_deref());
     }
 

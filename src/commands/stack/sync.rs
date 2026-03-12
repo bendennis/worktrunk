@@ -9,28 +9,8 @@ use worktrunk::styling::{
     eprintln, hint_message, info_message, progress_message, success_message, warning_message,
 };
 
-use super::lineage::collect_descendants;
+use super::lineage::{collect_descendants, find_stack_scope};
 use super::rebase::cascade_rebase;
-
-/// Find the topmost branch in the current branch's lineage that still has a
-/// parent (i.e., the first branch after the root). For `main → A → B → C`,
-/// calling from C returns A.
-///
-/// Returns `None` if the current branch *is* the root (has no parent).
-fn find_stack_base(repo: &Repository, branch: &str) -> Option<String> {
-    let mut current = branch.to_string();
-    let mut child_of_root = None;
-    let mut seen = std::collections::HashSet::new();
-    seen.insert(current.clone());
-    while let Some(parent) = repo.branch_parent(&current) {
-        if !seen.insert(parent.clone()) {
-            break;
-        }
-        child_of_root = Some(current);
-        current = parent;
-    }
-    child_of_root
-}
 
 pub fn stack_sync(
     repo: &Repository,
@@ -44,7 +24,8 @@ pub fn stack_sync(
         .flatten()
         .context("Cannot determine current branch (detached HEAD?)")?;
 
-    let stack_base = find_stack_base(repo, &current_branch)
+    let stack_base = find_stack_scope(repo, &current_branch)
+        .map(|(_, base)| base)
         .context("Current branch is not part of a stack (no parent set)")?;
 
     // Step 1: Fetch
@@ -69,7 +50,8 @@ pub fn stack_sync(
 
     // Re-resolve stack base after pruning — parent relationships may have changed
     // (e.g., if the stack base itself was integrated and its children reparented)
-    let stack_base = find_stack_base(repo, &current_branch)
+    let stack_base = find_stack_scope(repo, &current_branch)
+        .map(|(_, base)| base)
         .context("All stack branches have been integrated")?;
 
     // Step 3: Cascade rebase from stack base

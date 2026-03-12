@@ -6,20 +6,26 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use worktrunk::git::Repository;
 
-/// Walk up from `branch` to find the root of its stack (a branch with no parent,
-/// typically the default branch).
-pub fn find_stack_root(repo: &Repository, branch: &str) -> String {
+/// Walk up from `branch` to find the stack root and stack base.
+///
+/// The **root** is the topmost branch with no parent (e.g., `main`).
+/// The **base** is the first branch after root in the current branch's lineage
+/// (e.g., for `main → A → B → C`, calling from C returns `(main, A)`).
+///
+/// Returns `None` if the branch has no parent (it is a root itself).
+pub fn find_stack_scope(repo: &Repository, branch: &str) -> Option<(String, String)> {
     let mut current = branch.to_string();
+    let mut child_of_root = None;
     let mut seen = HashSet::new();
     seen.insert(current.clone());
     while let Some(parent) = repo.branch_parent(&current) {
         if !seen.insert(parent.clone()) {
-            // Cycle detected — stop at current
             break;
         }
+        child_of_root = Some(current);
         current = parent;
     }
-    current
+    child_of_root.map(|base| (current, base))
 }
 
 /// Collect all descendants of `root` as a parent→children map.
