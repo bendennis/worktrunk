@@ -12,11 +12,7 @@ use worktrunk::styling::{
 use super::lineage::{collect_descendants, find_stack_scope};
 use super::rebase::cascade_rebase;
 
-pub fn stack_sync(
-    repo: &Repository,
-    no_fetch: bool,
-    no_push: bool,
-) -> anyhow::Result<()> {
+pub fn stack_sync(repo: &Repository, no_fetch: bool, no_push: bool) -> anyhow::Result<()> {
     let current_branch = repo
         .current_worktree()
         .branch()
@@ -30,17 +26,11 @@ pub fn stack_sync(
 
     // Step 1: Fetch
     if !no_fetch {
-        eprintln!(
-            "{}",
-            progress_message("Fetching from remote...")
-        );
+        eprintln!("{}", progress_message("Fetching from remote..."));
         match repo.run_command(&["fetch", "--prune"]) {
             Ok(_) => {}
             Err(e) => {
-                eprintln!(
-                    "{}",
-                    warning_message(format!("Fetch failed: {e}"))
-                );
+                eprintln!("{}", warning_message(format!("Fetch failed: {e}")));
             }
         }
     }
@@ -79,16 +69,12 @@ pub fn stack_sync(
                 // No upstream — push with -u to set it
                 eprintln!(
                     "{}",
-                    progress_message(cformat!(
-                        "Pushing <bold>{branch}</> (setting upstream)..."
-                    ))
+                    progress_message(cformat!("Pushing <bold>{branch}</> (setting upstream)..."))
                 );
                 if let Err(e) = wt.run_command(&["push", "-u", "origin", branch]) {
                     eprintln!(
                         "{}",
-                        warning_message(cformat!(
-                            "Failed to push <bold>{branch}</>: {e}"
-                        ))
+                        warning_message(cformat!("Failed to push <bold>{branch}</>: {e}"))
                     );
                 }
             } else {
@@ -109,16 +95,12 @@ pub fn stack_sync(
                 // Has upstream but differs — force-with-lease (safe for post-rebase)
                 eprintln!(
                     "{}",
-                    progress_message(cformat!(
-                        "Pushing <bold>{branch}</>..."
-                    ))
+                    progress_message(cformat!("Pushing <bold>{branch}</>..."))
                 );
                 if let Err(e) = wt.run_command(&["push", "--force-with-lease"]) {
                     eprintln!(
                         "{}",
-                        warning_message(cformat!(
-                            "Failed to push <bold>{branch}</>: {e}"
-                        ))
+                        warning_message(cformat!("Failed to push <bold>{branch}</>: {e}"))
                     );
                 }
             }
@@ -133,10 +115,7 @@ pub fn stack_sync(
 /// Detect and prune branches that have been integrated into their parent
 /// (e.g., merged on GitHub). Reparents children to the integrated branch's
 /// parent, keeping the stack intact. Returns the set of pruned branch names.
-fn prune_integrated_branches(
-    repo: &Repository,
-    root: &str,
-) -> anyhow::Result<HashSet<String>> {
+fn prune_integrated_branches(repo: &Repository, root: &str) -> anyhow::Result<HashSet<String>> {
     let children_map = collect_descendants(repo, root);
     let mut pruned = HashSet::new();
 
@@ -157,12 +136,8 @@ fn prune_integrated_branches(
             continue;
         };
 
-        // Check if branch is integrated into its parent
-        let is_integrated = repo
-            .integration_reason(&branch, &parent)
-            .ok()
-            .and_then(|(_, reason)| reason)
-            .is_some();
+        // Check if branch's upstream is gone (remote branch deleted after PR merge)
+        let is_integrated = repo.branch(&branch).upstream_is_gone();
 
         if is_integrated {
             let reparented = repo.reparent_children(&branch, Some(&parent))?;

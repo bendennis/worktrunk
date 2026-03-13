@@ -172,6 +172,24 @@ impl<'a> Branch<'a> {
         }
     }
 
+    /// Check if this branch's upstream tracking ref is "gone."
+    ///
+    /// Returns `true` when the branch has a configured upstream whose remote ref
+    /// has been deleted (e.g., after `git fetch --prune` removes a merged branch).
+    /// Returns `false` for no upstream, a valid upstream, or a non-existent branch.
+    pub fn upstream_is_gone(&self) -> bool {
+        let result = self.repo.run_command(&[
+            "for-each-ref",
+            "--format=%(upstream:track)",
+            &format!("refs/heads/{}", self.name),
+        ]);
+
+        match result {
+            Ok(output) => output.trim() == "[gone]",
+            Err(_) => false,
+        }
+    }
+
     /// Get the GitHub URL for this branch's push remote, if it's a GitHub URL.
     ///
     /// Returns the push remote URL if configured and pointing to GitHub,

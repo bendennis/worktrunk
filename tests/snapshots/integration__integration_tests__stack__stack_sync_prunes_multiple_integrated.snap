@@ -47,6 +47,5 @@ exit_code: 0
 [2m○[22m [1mfeature-a[22m integrated into [1mmain[22m; reparented 1 child branch to [1mmain[22m
 [2m○[22m [1mfeature-b[22m integrated into [1mmain[22m; reparented 1 child branch to [1mmain[22m
 [2m↳[22m [2mTo remove, run [4mwt remove feature-a feature-b[24m[22m
-[36m◎[39m [36mRebasing [1mfeature-c[22m onto [1mmain[22m...[39m
-[32m✓[39m [32mRebased [1mfeature-c[22m onto [1mmain[22m[39m
+[2m○[22m [1mfeature-c[22m already up-to-date with [1mmain[22m
 [32m✓[39m [32mSync complete[39m

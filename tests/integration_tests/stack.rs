@@ -29,20 +29,16 @@ fn test_stack_set_parent_and_show(mut repo: TestRepo) {
     let _guard = settings.bind_to_scope();
 
     // Set parent
-    assert_cmd_snapshot!("set_parent", make_snapshot_cmd(
-        &repo,
-        "stack",
-        &["set-parent", "main"],
-        Some(&feature_path),
-    ));
+    assert_cmd_snapshot!(
+        "set_parent",
+        make_snapshot_cmd(&repo, "stack", &["set-parent", "main"], Some(&feature_path),)
+    );
 
     // Show the tree
-    assert_cmd_snapshot!("show", make_snapshot_cmd(
-        &repo,
-        "stack",
-        &["show"],
-        Some(&feature_path),
-    ));
+    assert_cmd_snapshot!(
+        "show",
+        make_snapshot_cmd(&repo, "stack", &["show"], Some(&feature_path),)
+    );
 }
 
 /// `wt stack set-parent` rejects self-reference
@@ -169,20 +165,16 @@ fn test_stack_show_deep(mut repo: TestRepo) {
     let _guard = settings.bind_to_scope();
 
     // Show from leaf
-    assert_cmd_snapshot!("from_leaf", make_snapshot_cmd(
-        &repo,
-        "stack",
-        &["show"],
-        Some(&c_path),
-    ));
+    assert_cmd_snapshot!(
+        "from_leaf",
+        make_snapshot_cmd(&repo, "stack", &["show"], Some(&c_path),)
+    );
 
     // Show from middle
-    assert_cmd_snapshot!("from_middle", make_snapshot_cmd(
-        &repo,
-        "stack",
-        &["show"],
-        Some(&b_path),
-    ));
+    assert_cmd_snapshot!(
+        "from_middle",
+        make_snapshot_cmd(&repo, "stack", &["show"], Some(&b_path),)
+    );
 }
 
 /// `wt stack show --all` shows multiple independent stacks
@@ -240,12 +232,15 @@ fn test_stack_set_parent_branch_flag(mut repo: TestRepo) {
     ));
 
     // Verify via config state
-    assert_cmd_snapshot!("verify", make_snapshot_cmd(
-        &repo,
-        "config",
-        &["state", "parent", "get", "--branch", "feature-b"],
-        None,
-    ));
+    assert_cmd_snapshot!(
+        "verify",
+        make_snapshot_cmd(
+            &repo,
+            "config",
+            &["state", "parent", "get", "--branch", "feature-b"],
+            None,
+        )
+    );
 }
 
 /// `wt list --format=json` includes parent field
@@ -283,7 +278,10 @@ fn test_list_json_includes_parent(mut repo: TestRepo) {
         .iter()
         .find(|item| item["branch"].as_str() == Some("feature-a"))
         .expect("feature-a should be in list output");
-    assert!(feature_a.get("parent").is_none(), "default branch parent should be hidden");
+    assert!(
+        feature_a.get("parent").is_none(),
+        "default branch parent should be hidden"
+    );
 
     // feature-b: parent is feature-a (non-default), so it's shown
     let feature_b = items
@@ -400,7 +398,11 @@ fn test_reparent_on_remove_detach(mut repo: TestRepo) {
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.trim().is_empty(), "Expected no parent, got: {}", stdout.trim());
+    assert!(
+        stdout.trim().is_empty(),
+        "Expected no parent, got: {}",
+        stdout.trim()
+    );
 }
 
 /// Linear cascade rebase: main → A → B, advance main, rebase from A
@@ -446,11 +448,20 @@ fn test_stack_rebase_linear(mut repo: TestRepo) {
     ));
 
     // Verify A has main-update.txt (rebased onto main)
-    assert!(a_path.join("main-update.txt").exists(), "A should have main-update.txt after rebase");
+    assert!(
+        a_path.join("main-update.txt").exists(),
+        "A should have main-update.txt after rebase"
+    );
 
     // Verify B has both main-update.txt and a.txt (cascaded rebase)
-    assert!(b_path.join("main-update.txt").exists(), "B should have main-update.txt after cascade");
-    assert!(b_path.join("a.txt").exists(), "B should have a.txt after cascade");
+    assert!(
+        b_path.join("main-update.txt").exists(),
+        "B should have main-update.txt after cascade"
+    );
+    assert!(
+        b_path.join("a.txt").exists(),
+        "B should have a.txt after cascade"
+    );
 }
 
 /// Rebase when already up-to-date is a no-op
@@ -522,8 +533,14 @@ fn test_stack_rebase_branching(mut repo: TestRepo) {
     assert!(output.status.success(), "Rebase should succeed");
 
     // Both children should have A's update
-    assert!(b_path.join("a-update.txt").exists(), "B should have a-update.txt");
-    assert!(c_path.join("a-update.txt").exists(), "C should have a-update.txt");
+    assert!(
+        b_path.join("a-update.txt").exists(),
+        "B should have a-update.txt"
+    );
+    assert!(
+        c_path.join("a-update.txt").exists(),
+        "C should have a-update.txt"
+    );
 }
 
 /// Rebase fails when child has no worktree
@@ -540,7 +557,13 @@ fn test_stack_rebase_missing_worktree(mut repo: TestRepo) {
     // Set parent for a branch that exists but has no worktree
     repo.run_git_in(repo.root_path(), &["branch", "orphan-branch"]);
     repo.wt_command()
-        .args(["stack", "set-parent", "feature-a", "--branch", "orphan-branch"])
+        .args([
+            "stack",
+            "set-parent",
+            "feature-a",
+            "--branch",
+            "orphan-branch",
+        ])
         .output()
         .unwrap();
 
@@ -590,7 +613,10 @@ fn test_stack_rebase_conflict(mut repo: TestRepo) {
 
     assert!(!output.status.success(), "Rebase should fail on conflict");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("conflict") || stderr.contains("Rebase"), "Should mention conflict: {stderr}");
+    assert!(
+        stderr.contains("conflict") || stderr.contains("Rebase"),
+        "Should mention conflict: {stderr}"
+    );
 }
 
 /// `wt stack sync --no-fetch --no-push` is equivalent to cascade rebase
@@ -635,7 +661,10 @@ fn test_stack_sync_no_fetch_no_push(mut repo: TestRepo) {
     ));
 
     // Verify cascade worked
-    assert!(b_path.join("update.txt").exists(), "B should have update.txt");
+    assert!(
+        b_path.join("update.txt").exists(),
+        "B should have update.txt"
+    );
     assert!(b_path.join("a.txt").exists(), "B should have a.txt");
 }
 
@@ -686,10 +715,17 @@ fn test_stack_sync_with_remote(mut repo: TestRepo) {
         .current_dir(&a_path)
         .output()
         .unwrap();
-    assert!(output.status.success(), "Sync should succeed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "Sync should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Verify cascade worked
-    assert!(b_path.join("update.txt").exists(), "B should have update.txt after sync");
+    assert!(
+        b_path.join("update.txt").exists(),
+        "B should have update.txt after sync"
+    );
 
     // Verify branches were pushed (check remote has our commits)
     let remote_log = std::process::Command::new("git")
@@ -698,7 +734,10 @@ fn test_stack_sync_with_remote(mut repo: TestRepo) {
         .output()
         .unwrap();
     let remote_a = String::from_utf8_lossy(&remote_log.stdout);
-    assert!(remote_a.contains("Add a"), "Remote should have feature-a commits");
+    assert!(
+        remote_a.contains("Add a"),
+        "Remote should have feature-a commits"
+    );
 }
 
 /// `wt stack sync --no-push` fetches and rebases but skips push
@@ -735,7 +774,10 @@ fn test_stack_sync_no_push(mut repo: TestRepo) {
     assert!(output.status.success(), "Sync should succeed");
 
     // Verify rebase happened
-    assert!(a_path.join("update.txt").exists(), "A should have update.txt");
+    assert!(
+        a_path.join("update.txt").exists(),
+        "A should have update.txt"
+    );
 
     // Verify feature-a was NOT pushed (no tracking branch on remote)
     let remote_refs = std::process::Command::new("git")
@@ -744,7 +786,10 @@ fn test_stack_sync_no_push(mut repo: TestRepo) {
         .output()
         .unwrap();
     let remote_refs = String::from_utf8_lossy(&remote_refs.stdout);
-    assert!(!remote_refs.contains("feature-a"), "feature-a should not be on remote");
+    assert!(
+        !remote_refs.contains("feature-a"),
+        "feature-a should not be on remote"
+    );
 }
 
 /// `wt switch -c --base` automatically sets parent
@@ -769,10 +814,11 @@ fn test_switch_create_with_base_sets_parent(mut repo: TestRepo) {
     assert_snapshot!(stdout.trim(), @"feature");
 }
 
-/// `wt stack sync` prunes integrated branches and reparents children.
-/// Simulates: main → A → B, A gets merged into main, sync detects and reparents B to main.
+/// `wt stack sync` prunes branches whose upstream is gone (PR merged + branch deleted).
+/// Simulates: main → A → B, A's remote ref deleted after merge, sync detects and reparents B.
 #[rstest]
 fn test_stack_sync_prunes_integrated_branch(mut repo: TestRepo) {
+    repo.setup_remote("main");
     let a_path = repo.add_worktree("feature-a");
     let b_path = repo.add_worktree("feature-b");
 
@@ -788,21 +834,25 @@ fn test_stack_sync_prunes_integrated_branch(mut repo: TestRepo) {
         .output()
         .unwrap();
 
-    // Add a commit on A
+    // Add a commit on A and push to create upstream tracking
     fs::write(a_path.join("a.txt"), "feature a content").unwrap();
     repo.run_git_in(&a_path, &["add", "a.txt"]);
     repo.run_git_in(&a_path, &["commit", "-m", "Add feature a"]);
+    repo.run_git_in(&a_path, &["push", "-u", "origin", "feature-a"]);
 
-    // Add a commit on B
+    // Add a commit on B and push
     fs::write(b_path.join("b.txt"), "feature b content").unwrap();
     repo.run_git_in(&b_path, &["add", "b.txt"]);
     repo.run_git_in(&b_path, &["commit", "-m", "Add feature b"]);
+    repo.run_git_in(&b_path, &["push", "-u", "origin", "feature-b"]);
 
-    // Simulate A being merged into main (cherry-pick A's commit onto main)
-    let main_path = repo.root_path().to_path_buf();
-    repo.run_git_in(&main_path, &["merge", "feature-a", "--no-ff", "-m", "Merge feature-a"]);
+    // Simulate A's PR being merged and remote branch deleted
+    let remote_path = repo.remote_path().unwrap().to_path_buf();
+    repo.run_git_in(&remote_path, &["branch", "-D", "feature-a"]);
+    // Fetch --prune to make git mark feature-a's upstream as gone
+    repo.run_git(&["fetch", "--prune"]);
 
-    // Sync from B — should detect A is integrated into main, reparent B to main
+    // Sync from B — should detect A's upstream is gone, reparent B to main
     let settings = setup_snapshot_settings(&repo);
     let _guard = settings.bind_to_scope();
     assert_cmd_snapshot!(make_snapshot_cmd(
@@ -828,16 +878,18 @@ fn test_stack_sync_prunes_integrated_branch(mut repo: TestRepo) {
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.trim().is_empty(), "A should have no parent after pruning, got: {}", stdout.trim());
-
-    // Verify B has A's file (rebase cascaded correctly)
-    assert!(b_path.join("a.txt").exists(), "B should have a.txt after rebase onto main");
+    assert!(
+        stdout.trim().is_empty(),
+        "A should have no parent after pruning, got: {}",
+        stdout.trim()
+    );
 }
 
-/// `wt stack sync` prunes multiple integrated branches in a chain.
-/// Simulates: main → A → B → C, both A and B merged into main.
+/// `wt stack sync` prunes multiple branches whose upstreams are gone.
+/// Simulates: main → A → B → C, both A and B have remote branches deleted.
 #[rstest]
 fn test_stack_sync_prunes_multiple_integrated(mut repo: TestRepo) {
+    repo.setup_remote("main");
     let a_path = repo.add_worktree("feature-a");
     let b_path = repo.add_worktree("feature-b");
     let c_path = repo.add_worktree("feature-c");
@@ -859,25 +911,29 @@ fn test_stack_sync_prunes_multiple_integrated(mut repo: TestRepo) {
         .output()
         .unwrap();
 
-    // Add commits
+    // Add commits and push each to create upstream tracking
     fs::write(a_path.join("a.txt"), "a").unwrap();
     repo.run_git_in(&a_path, &["add", "a.txt"]);
     repo.run_git_in(&a_path, &["commit", "-m", "Add a"]);
+    repo.run_git_in(&a_path, &["push", "-u", "origin", "feature-a"]);
 
     fs::write(b_path.join("b.txt"), "b").unwrap();
     repo.run_git_in(&b_path, &["add", "b.txt"]);
     repo.run_git_in(&b_path, &["commit", "-m", "Add b"]);
+    repo.run_git_in(&b_path, &["push", "-u", "origin", "feature-b"]);
 
     fs::write(c_path.join("c.txt"), "c").unwrap();
     repo.run_git_in(&c_path, &["add", "c.txt"]);
     repo.run_git_in(&c_path, &["commit", "-m", "Add c"]);
+    repo.run_git_in(&c_path, &["push", "-u", "origin", "feature-c"]);
 
-    // Merge both A and B into main
-    let main_path = repo.root_path().to_path_buf();
-    repo.run_git_in(&main_path, &["merge", "feature-a", "--no-ff", "-m", "Merge A"]);
-    repo.run_git_in(&main_path, &["merge", "feature-b", "--no-ff", "-m", "Merge B"]);
+    // Simulate A and B merged: delete their remote branches
+    let remote_path = repo.remote_path().unwrap().to_path_buf();
+    repo.run_git_in(&remote_path, &["branch", "-D", "feature-a"]);
+    repo.run_git_in(&remote_path, &["branch", "-D", "feature-b"]);
+    repo.run_git(&["fetch", "--prune"]);
 
-    // Sync from C — should detect A and B are integrated, reparent C to main
+    // Sync from C — should detect A and B are gone, reparent C to main
     let settings = setup_snapshot_settings(&repo);
     let _guard = settings.bind_to_scope();
     assert_cmd_snapshot!(make_snapshot_cmd(
@@ -895,4 +951,57 @@ fn test_stack_sync_prunes_multiple_integrated(mut repo: TestRepo) {
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert_eq!(stdout.trim(), "main", "C should be reparented to main");
+}
+
+/// `wt stack sync` does NOT prune a child branch at the same commit as its parent.
+/// Regression test: content-based checks falsely detected same-commit as "integrated."
+#[rstest]
+fn test_stack_sync_no_false_positive_same_commit(mut repo: TestRepo) {
+    repo.setup_remote("main");
+    let a_path = repo.add_worktree("feature-a");
+    let b_path = repo.add_worktree("feature-b");
+
+    // Build stack: main → A → B (B created at same commit as A — no divergence yet)
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+
+    // Push both to create upstream tracking (but don't delete remote refs)
+    repo.run_git_in(&a_path, &["push", "-u", "origin", "feature-a"]);
+    repo.run_git_in(&b_path, &["push", "-u", "origin", "feature-b"]);
+
+    // Sync from B — B should NOT be pruned even though it's at the same commit as A
+    let output = repo
+        .wt_command()
+        .args(["stack", "sync", "--no-fetch", "--no-push"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Verify no branches were reported as integrated
+    assert!(
+        !stderr.contains("integrated"),
+        "No branches should be pruned, but got: {stderr}"
+    );
+
+    // Verify B's parent is still A
+    let output = repo
+        .wt_command()
+        .args(["config", "state", "parent", "get", "--branch", "feature-b"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(
+        stdout.trim(),
+        "feature-a",
+        "B should still have A as parent, not be reparented"
+    );
 }

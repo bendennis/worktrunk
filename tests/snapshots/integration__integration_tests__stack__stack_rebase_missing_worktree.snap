@@ -39,12 +39,10 @@ info:
     WORKTRUNK_TEST_SKIP_URL_HEALTH_CHECK: "1"
     XDG_CONFIG_HOME: "[TEST_CONFIG_HOME]"
 ---
-success: true
-exit_code: 0
+success: false
+exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-[2m○[22m [1morphan-branch[22m integrated into [1mfeature-a[22m
-[2m↳[22m [2mTo remove, run [4mwt remove orphan-branch[24m[22m
 [2m○[22m [1mfeature-a[22m already up-to-date with [1mmain[22m
-[32m✓[39m [32mSync complete[39m
+[31m✗[39m [31mBranch [1morphan-branch[22m has no worktree. Run [1mwt switch orphan-branch[22m first.[39m
