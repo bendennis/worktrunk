@@ -29,9 +29,7 @@ pub fn cascade_rebase(repo: &Repository, start_branch: Option<&str>) -> anyhow::
         if rebase_branch(repo, &branch, &parent)? {
             eprintln!(
                 "{}",
-                success_message(cformat!(
-                    "Rebased <bold>{branch}</> onto <bold>{parent}</>"
-                ))
+                success_message(cformat!("Rebased <bold>{branch}</> onto <bold>{parent}</>"))
             );
         }
     }
@@ -48,18 +46,14 @@ pub fn cascade_rebase(repo: &Repository, start_branch: Option<&str>) -> anyhow::
     }
 
     while let Some(child) = queue.pop_front() {
-        let parent = repo
-            .branch_parent(&child)
-            .context(cformat!(
-                "Branch <bold>{child}</> lost its parent during cascade"
-            ))?;
+        let parent = repo.branch_parent(&child).context(cformat!(
+            "Branch <bold>{child}</> lost its parent during cascade"
+        ))?;
 
         if rebase_branch(repo, &child, &parent)? {
             eprintln!(
                 "{}",
-                success_message(cformat!(
-                    "Rebased <bold>{child}</> onto <bold>{parent}</>"
-                ))
+                success_message(cformat!("Rebased <bold>{child}</> onto <bold>{parent}</>"))
             );
         }
 

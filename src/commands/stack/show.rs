@@ -9,11 +9,7 @@ use super::lineage::{collect_descendants, find_all_roots, find_stack_scope};
 
 /// Render the stack tree containing the current branch.
 pub fn show_stack(repo: &Repository, all: bool) -> anyhow::Result<()> {
-    let current_branch = repo
-        .current_worktree()
-        .branch()
-        .ok()
-        .flatten();
+    let current_branch = repo.current_worktree().branch().ok().flatten();
 
     if all {
         show_all_stacks(repo, current_branch.as_deref())?;
@@ -25,7 +21,9 @@ pub fn show_stack(repo: &Repository, all: bool) -> anyhow::Result<()> {
         };
 
         let Some((root, stack_base)) = find_stack_scope(repo, branch) else {
-            eprintln!("No stacked branches found. Use `wt switch -c <branch> --base <parent>` to create one.");
+            eprintln!(
+                "No stacked branches found. Use `wt switch -c <branch> --base <parent>` to create one."
+            );
             return Ok(());
         };
 
@@ -42,7 +40,9 @@ pub fn show_stack(repo: &Repository, all: bool) -> anyhow::Result<()> {
 fn show_all_stacks(repo: &Repository, current_branch: Option<&str>) -> anyhow::Result<()> {
     let roots = find_all_roots(repo);
     if roots.is_empty() {
-        eprintln!("No stacked branches found. Use `wt switch -c <branch> --base <parent>` to create one.");
+        eprintln!(
+            "No stacked branches found. Use `wt switch -c <branch> --base <parent>` to create one."
+        );
         return Ok(());
     }
 

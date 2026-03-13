@@ -374,10 +374,7 @@ impl ColumnLayout {
                 let text = item.branch.as_deref().unwrap_or("-");
                 let mut cell = self.render_text_cell(text, text_style);
                 if let Some(ref parent) = item.parent {
-                    cell.push_styled(
-                        format!(" ← {parent}"),
-                        Style::new().dimmed(),
-                    );
+                    cell.push_styled(format!(" ← {parent}"), Style::new().dimmed());
                 }
                 cell
             }

@@ -148,7 +148,7 @@ fn resolve_fork_ref(
                         method: CreationMethod::Regular {
                             create_branch: false,
                             base_branch: None,
-                                },
+                        },
                     });
                 }
                 // Prefixed branch exists but tracks something else - error

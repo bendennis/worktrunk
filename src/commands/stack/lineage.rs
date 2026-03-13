@@ -124,10 +124,7 @@ pub fn find_all_roots(repo: &Repository) -> Vec<String> {
     }
 
     // Roots are parents that aren't children of anything in the stacking system
-    let mut roots: Vec<String> = parents_set
-        .difference(&children_set)
-        .cloned()
-        .collect();
+    let mut roots: Vec<String> = parents_set.difference(&children_set).cloned().collect();
     roots.sort();
     roots
 }

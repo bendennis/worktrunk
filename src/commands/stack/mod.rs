@@ -51,9 +51,7 @@ fn set_parent(parent: String, branch_arg: Option<String>) -> anyhow::Result<()> 
 
     // Validate: parent branch exists
     if !repo.branch(&parent).exists()? {
-        bail!(cformat!(
-            "Branch <bold>{parent}</> does not exist"
-        ));
+        bail!(cformat!("Branch <bold>{parent}</> does not exist"));
     }
 
     // Validate: no cycles
@@ -90,16 +88,12 @@ fn unset_parent(branch_arg: Option<String>) -> anyhow::Result<()> {
     if had_parent {
         eprintln!(
             "{}",
-            success_message(cformat!(
-                "Removed parent of <bold>{branch}</>"
-            ))
+            success_message(cformat!("Removed parent of <bold>{branch}</>"))
         );
     } else {
         eprintln!(
             "{}",
-            info_message(cformat!(
-                "Branch <bold>{branch}</> has no parent set"
-            ))
+            info_message(cformat!("Branch <bold>{branch}</> has no parent set"))
         );
     }
     Ok(())

@@ -436,7 +436,9 @@ pub fn handle_state_set(key: &str, value: String, branch: Option<String>) -> any
             );
         }
         _ => {
-            anyhow::bail!("Unknown key: {key}. Valid keys: default-branch, previous-branch, marker, parent")
+            anyhow::bail!(
+                "Unknown key: {key}. Valid keys: default-branch, previous-branch, marker, parent"
+            )
         }
     }
 
