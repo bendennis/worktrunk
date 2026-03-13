@@ -9,7 +9,7 @@ use worktrunk::styling::{
     eprintln, hint_message, info_message, progress_message, success_message, warning_message,
 };
 
-use super::lineage::{collect_descendants, find_stack_scope};
+use super::lineage::{collect_descendants, find_root_and_base};
 use super::rebase::cascade_rebase;
 
 pub fn stack_sync(repo: &Repository, no_fetch: bool, no_push: bool) -> anyhow::Result<()> {
@@ -20,7 +20,7 @@ pub fn stack_sync(repo: &Repository, no_fetch: bool, no_push: bool) -> anyhow::R
         .flatten()
         .context("Cannot determine current branch (detached HEAD?)")?;
 
-    let stack_base = find_stack_scope(repo, &current_branch)
+    let stack_base = find_root_and_base(repo, &current_branch)
         .map(|(_, base)| base)
         .context("Current branch is not part of a stack (no parent set)")?;
 
@@ -49,7 +49,7 @@ pub fn stack_sync(repo: &Repository, no_fetch: bool, no_push: bool) -> anyhow::R
 
     // Re-resolve stack base after pruning — parent relationships may have changed
     // (e.g., if the stack base itself was integrated and its children reparented)
-    let stack_base = find_stack_scope(repo, &current_branch)
+    let stack_base = find_root_and_base(repo, &current_branch)
         .map(|(_, base)| base)
         .context("All stack branches have been integrated")?;
 

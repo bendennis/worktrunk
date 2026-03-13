@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use color_print::cformat;
 use worktrunk::git::Repository;
 
-use super::lineage::{collect_descendants, find_all_roots, find_stack_scope};
+use super::lineage::{collect_descendants, find_all_roots, find_root_and_base};
 
 /// Render the stack tree containing the current branch.
 pub fn show_stack(repo: &Repository, all: bool) -> anyhow::Result<()> {
@@ -20,18 +20,22 @@ pub fn show_stack(repo: &Repository, all: bool) -> anyhow::Result<()> {
             return Ok(());
         };
 
-        let Some((root, stack_base)) = find_stack_scope(repo, branch) else {
-            eprintln!(
-                "No stacked branches found. Use `wt switch -c <branch> --base <parent>` to create one."
-            );
-            return Ok(());
-        };
-
-        // Collect descendants only from the stack base, then add root → [stack_base]
-        // so the tree shows root for context but excludes sibling stacks
-        let mut children_map = collect_descendants(repo, &stack_base);
-        children_map.insert(root.clone(), vec![stack_base]);
-        render_tree(&root, &children_map, current_branch.as_deref());
+        if let Some((root, stack_base)) = find_root_and_base(repo, branch) {
+            // Branch is inside a stack — show only its lineage from root
+            let mut children_map = collect_descendants(repo, &stack_base);
+            children_map.insert(root.clone(), vec![stack_base]);
+            render_tree(&root, &children_map, current_branch.as_deref());
+        } else {
+            // Branch has no parent — check if it's a root of any stacks
+            let children_map = collect_descendants(repo, branch);
+            if children_map.is_empty() {
+                eprintln!(
+                    "No stacked branches found. Use `wt switch -c <branch> --base <parent>` to create one."
+                );
+                return Ok(());
+            }
+            render_tree(branch, &children_map, current_branch.as_deref());
+        }
     }
 
     Ok(())

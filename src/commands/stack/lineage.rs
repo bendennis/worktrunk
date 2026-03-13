@@ -13,7 +13,7 @@ use worktrunk::git::Repository;
 /// (e.g., for `main → A → B → C`, calling from C returns `(main, A)`).
 ///
 /// Returns `None` if the branch has no parent (it is a root itself).
-pub fn find_stack_scope(repo: &Repository, branch: &str) -> Option<(String, String)> {
+pub fn find_root_and_base(repo: &Repository, branch: &str) -> Option<(String, String)> {
     let mut current = branch.to_string();
     let mut child_of_root = None;
     let mut seen = HashSet::new();

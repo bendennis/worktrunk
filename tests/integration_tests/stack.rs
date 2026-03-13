@@ -214,6 +214,42 @@ fn test_stack_show_all(mut repo: TestRepo) {
     ));
 }
 
+/// `wt stack show` from a root branch shows its stacks
+#[rstest]
+fn test_stack_show_from_root(mut repo: TestRepo) {
+    let a_path = repo.add_worktree("feature-a");
+    let b_path = repo.add_worktree("feature-b");
+    let x_path = repo.add_worktree("feature-x");
+
+    // Stack: main → A → B, main → X
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&a_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "feature-a"])
+        .current_dir(&b_path)
+        .output()
+        .unwrap();
+    repo.wt_command()
+        .args(["stack", "set-parent", "main"])
+        .current_dir(&x_path)
+        .output()
+        .unwrap();
+
+    let settings = setup_snapshot_settings(&repo);
+    let _guard = settings.bind_to_scope();
+
+    // Show from main (root) — should display all stacks rooted at main
+    assert_cmd_snapshot!(make_snapshot_cmd(
+        &repo,
+        "stack",
+        &["show"],
+        Some(repo.root_path()),
+    ));
+}
+
 /// `wt stack set-parent` with `--branch` flag
 #[rstest]
 fn test_stack_set_parent_branch_flag(mut repo: TestRepo) {
