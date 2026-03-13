@@ -24,8 +24,17 @@ pub fn stack_sync(repo: &Repository, no_fetch: bool, no_push: bool) -> anyhow::R
         .map(|(_, base)| base)
         .context("Current branch is not part of a stack (no parent set)")?;
 
+    // Check for a configured remote — fetch and push require one
+    let has_remote = repo.primary_remote().is_ok();
+    if !has_remote && !no_fetch && !no_push {
+        eprintln!(
+            "{}",
+            warning_message("No remote configured; skipping fetch and push")
+        );
+    }
+
     // Step 1: Fetch
-    if !no_fetch {
+    if !no_fetch && has_remote {
         eprintln!("{}", progress_message("Fetching from remote..."));
         match repo.run_command(&["fetch", "--prune"]) {
             Ok(_) => {}
@@ -48,7 +57,7 @@ pub fn stack_sync(repo: &Repository, no_fetch: bool, no_push: bool) -> anyhow::R
     cascade_rebase(repo, Some(&stack_base))?;
 
     // Step 4: Push each branch with --force-with-lease
-    if !no_push {
+    if !no_push && has_remote {
         let branches = collect_stack_branches(repo, &stack_base);
         for branch in &branches {
             if pruned.contains(branch) {
